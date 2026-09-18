@@ -23,7 +23,7 @@ struct Rectangle
 	float h;
 };
 
-struct AABB
+struct AABB2
 {
 	glm::vec2 min;
 	glm::vec2 max;
@@ -58,28 +58,28 @@ struct ValueDefinition
  * Tries to find the intersection of two AABBs.
  * Returns true if they intersect, otherwise exits early with a false retval.
  */
-bool IntersectAABB(const AABB& a, const AABB& b, AABB& c);
+bool IntersectAABB(const AABB2& a, const AABB2& b, AABB2& c);
 
 /**
  * calculates the necessary transforms that transform from -> to
  */
-void CalculateRelativeTransformAABB(const AABB& from, const AABB& to, glm::vec2& scale, glm::vec2& offset);
+void CalculateRelativeTransformAABB(const AABB2& from, const AABB2& to, glm::vec2& scale, glm::vec2& offset);
 
 /**
  * Transform an AABB based on scaling and position offset.
  */
-void TransformAABB(AABB& a, glm::vec2& scale, glm::vec2& offset);
+void TransformAABB(AABB2& a, glm::vec2& scale, glm::vec2& offset);
 
 /**
  * This function is an amalgamation of:
  * - calculating the needed transform that turns start -> end
  * - using this transform on
  */
-void TransformBasedOnTwoRelativeAABB(const AABB& start, const AABB& end, AABB& toTransform);
+void TransformBasedOnTwoRelativeAABB(const AABB2& start, const AABB2& end, AABB2& toTransform);
 
-bool IsPointInsideAABB(const AABB& box, const glm::vec2& point);
+bool IsPointInsideAABB(const AABB2& box, const glm::vec2& point);
 
-AABB GetRectangleOfCharacter(char c);
+AABB2 GetRectangleOfCharacter(char c);
 
 //This functions takes in vec2 raw screen coordinates,
 //And spits out the correct NDC coordinates

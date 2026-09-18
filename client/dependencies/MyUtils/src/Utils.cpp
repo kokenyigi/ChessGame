@@ -12,7 +12,7 @@
 #include <unordered_map>
 
 
-bool IntersectAABB(const AABB& a, const AABB& b, AABB& c)
+bool IntersectAABB(const AABB2& a, const AABB2& b, AABB2& c)
 {
 	if(a.min.x < b.max.x && a.max.x > b.min.x && a.min.y < b.max.y && a.max.y > b.min.y)
 	{
@@ -33,7 +33,7 @@ bool IntersectAABB(const AABB& a, const AABB& b, AABB& c)
 /**
  * calculates the necessary transforms that transform from -> to
  */
-void CalculateRelativeTransformAABB(const AABB& from, const AABB& to, glm::vec2& scale, glm::vec2& offset)
+void CalculateRelativeTransformAABB(const AABB2& from, const AABB2& to, glm::vec2& scale, glm::vec2& offset)
 {
 	float fromW = (from.max.x - from.min.x);
 	float fromH = (from.max.y - from.min.y);
@@ -50,7 +50,7 @@ void CalculateRelativeTransformAABB(const AABB& from, const AABB& to, glm::vec2&
 /**
  * Transform an AABB based on scaling and position offset.
  */
-void TransformAABB(AABB& a, glm::vec2& scale, glm::vec2& offset)
+void TransformAABB(AABB2& a, glm::vec2& scale, glm::vec2& offset)
 {
 	float aW = (a.max.x - a.min.x);
 	float aH = (a.max.y - a.min.y);
@@ -72,7 +72,7 @@ void TransformAABB(AABB& a, glm::vec2& scale, glm::vec2& offset)
  * - calculating the needed transform that turns start -> end
  * - using this transform on
  */
-void TransformBasedOnTwoRelativeAABB(const AABB& start, const AABB& end, AABB& toTransform)
+void TransformBasedOnTwoRelativeAABB(const AABB2& start, const AABB2& end, AABB2& toTransform)
 {
 	glm::vec2 scale;
 	glm::vec2 offset;
@@ -80,14 +80,14 @@ void TransformBasedOnTwoRelativeAABB(const AABB& start, const AABB& end, AABB& t
 	TransformAABB(toTransform,scale,offset);
 }
 
-bool IsPointInsideAABB(const AABB &box, const glm::vec2 &point)
+bool IsPointInsideAABB(const AABB2 &box, const glm::vec2 &point)
 {
 	return point.x >= box.min.x && point.x <= box.max.x && point.y >= box.min.y && point.y <= box.max.y;
 }
 
-AABB GetRectangleOfCharacter(char c)
+AABB2 GetRectangleOfCharacter(char c)
 {
-	AABB retval = {glm::vec2(0.0f,0.0f),glm::vec2(0.1f,0.1f)};
+	AABB2 retval = {glm::vec2(0.0f,0.0f),glm::vec2(0.1f,0.1f)};
 
     if(c >= ' ' && c<= '~')
     {    

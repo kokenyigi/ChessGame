@@ -1,0 +1,21 @@
+#pragma once
+#ifndef INDEXBUFFER_H
+#define INDEXBUFFER_H
+
+class IndexBuffer
+{
+private:
+	unsigned int m_iboID;
+public:
+	IndexBuffer();
+
+	void Init(const unsigned int* indices, int count);
+
+	void Bind() const;
+	void Unbind() const;
+
+	void Delete();
+};
+
+
+#endif
