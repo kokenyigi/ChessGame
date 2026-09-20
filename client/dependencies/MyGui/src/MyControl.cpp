@@ -442,8 +442,7 @@ void Control::CalculateCutBox()
 
 void Control::ControlRender()
 {
-	
-	CalculateCutBox();
+	if(this->GetIsVisible() == false) return;
 
 	bool doesCutBoxHaveAnyArea = this->DoesCutBoxHaveArea();
 	if(!doesCutBoxHaveAnyArea) return;
@@ -506,6 +505,7 @@ void Control::ControlRender()
 void Control::ControlResize()
 {
 	RecalculatePosition();
+	CalculateCutBox();
 }
 
 bool Control::ControlClick(MouseButtonType button, MouseActionType action)

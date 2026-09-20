@@ -138,7 +138,7 @@ public:
 	virtual void VirtualResize() {ControlResize();}
 	virtual bool VirtualMouseMove() {return ControlMouseMove();}
 	virtual bool VirtualClick(MouseButtonType button, MouseActionType action) {return ControlClick(button,action);}
-	virtual bool VirtualMouseWheel(float amount, MouseWheelDirection direction) {/*Control doesn't do shit on mousewheel.*/}
+	virtual bool VirtualMouseWheel(float amount, MouseWheelDirection direction) {/*Control doesn't do shit on mousewheel.*/ return false;}
 	virtual void VirtualKeyInput(int key, int action, int mods) {/* A Control doesn't do anything when keypress happens.*/}
 	
 
