@@ -45,6 +45,8 @@ struct GuiContext
 
 	Control* focusedControl = nullptr;
 
+	Control* topLevelControl = nullptr;
+
 	bool isMouseDisabled = false;
 	/*
 	Texture guiTexture;

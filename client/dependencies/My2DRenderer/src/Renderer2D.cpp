@@ -274,6 +274,8 @@ void Renderer2D::RenderColoredTexturedRectangleInstanced(const Rectangle &dstRec
 
 void Renderer2D::Render()
 {
+    //std::cout<< "[Renderer2D]: Rendering pass starts.\n";
+
     bool wasDepthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
     if(wasDepthTestEnabled == false)
     {
@@ -284,6 +286,8 @@ void Renderer2D::Render()
 
     if(this->_drawInstanceCount > 0)
     {
+        //std::cout<<"[Renderer2D]: I will render " << this->_drawInstanceCount << " Number of instances!\n";
+
         glBindVertexArray(this->_boxVao);
         glBindBuffer(GL_ARRAY_BUFFER,this->_boxInstancesVbo);
         glBufferSubData(GL_ARRAY_BUFFER,0,sizeof(TexturedColoredRectangleInstance) * this->_drawInstanceCount,

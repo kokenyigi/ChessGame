@@ -47,7 +47,7 @@ protected:
 	Control* parent = nullptr;
 
 	//These variables are updated when certain I/O events happen
-	uint32_t _stateBitmask = 0;
+	uint32_t _stateBitmask = 0u | (uint32_t)ControlStateBitmask::ISVISIBLE_BIT | (uint32_t)ControlStateBitmask::ISACTIVE_BIT;
 
 	// This value can be only modified when the control is added to a container, for safety reasons
 	// Controls with higher priority will be drawn over the ones with lower priority
@@ -85,7 +85,8 @@ public:
 
 	void Render()
 	{
-		if(GetIsActive() && GetIsVisible())
+		//std::cout<<"Controlrender claaed\n";
+		if(GetIsActive())
 		{
 			VirtualRender();
 		}
@@ -176,6 +177,8 @@ public:
 
 
 	void SetIsActive(bool isActive);
+	void SetIsHovered(bool isHovered);
+	void SetIsClicked(bool isClicked);
 	void SetIsFocused(bool isFocused);
 	void SetIsVisible(bool isVisible);
 	void SetZPriority(int newZPriority){_zPriority = newZPriority;}
@@ -196,6 +199,7 @@ public:
 
 	inline int GetZPriority() const {return _zPriority;}
 	inline glm::vec3 GetBgColor() const {return _baseColor;}
+	inline Control* Getparent() const {return this->parent;}
 
 private:
 	//A control doesn't have any exclusive private methods, cuz why would it have..idk.
@@ -219,6 +223,9 @@ protected:
 
 	virtual void SubControlSetGuicontext(GuiContext* guiContext){}
 	virtual void SubControlSetIsActive(bool isActive){};
+	virtual void SubControlTurnOffHovered(){}
+	virtual void SubControlTurnOffClicked(){}
+	virtual void SubControlTurnOffFocused(){}
 
 	void EnableStateBit(uint32_t bitmask) {this->_stateBitmask |= bitmask;}
 	void DisableStateBit(uint32_t bitmask) {this->_stateBitmask &= ~bitmask;}
@@ -226,6 +233,9 @@ protected:
 	bool IsCursorOnControl(const glm::vec2& cursorPos);
 	float CalculateValuebasedOnType(ValueType type, float value,int axis);
 	float CalculateValuebasedOnType(ValueType type, float value,float relativeTo);
+
+	Control* GetOldestParent();
+	void TrySetAsTopLevelControl();
 };
 
 #endif

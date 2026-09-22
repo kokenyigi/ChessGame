@@ -28,6 +28,7 @@ void Control::SetRelativePlacement(const glm::vec2 &minPos, const glm::vec2 &max
 
 void Control::SetIsFocused(bool isFocused)
 {
+	bool hasFocusedChanged = false;
 	if(guiContext != nullptr)
 	{
 		if(isFocused == true)
@@ -40,40 +41,88 @@ void Control::SetIsFocused(bool isFocused)
 			guiContext->focusedControl = this;
 
 			EnableStateBit((uint32_t)ControlStateBitmask::ISFOCUSED_BIT);
+			hasFocusedChanged = true;
+
 		}
 		else
 		{
 			if(GetIsFocused() == true || guiContext->focusedControl == this)
 			{
 				DisableStateBit((uint32_t)ControlStateBitmask::ISFOCUSED_BIT);
+				hasFocusedChanged = true;
 				guiContext->focusedControl = nullptr;
 			}
 
 
 		}
+
+		if(isFocused == false)
+		{
+			this->SubControlTurnOffFocused(); // propagates changes forward to the children
+		}
 	}
+
+	
 }
+
 
 void Control::SetIsActive(bool isActive)
 {
 	if(isActive == true)
 	{
-		if(GetIsActive() == false) // we only do anything if it wasnt active before
+		EnableStateBit((uint32_t)ControlStateBitmask::ISACTIVE_BIT);
+			
+		if(this->parent == nullptr)
 		{
-			EnableStateBit((uint32_t)ControlStateBitmask::ISACTIVE_BIT);
+			this->TrySetAsTopLevelControl();
 		}
+
+		Control* oldestParent = this->GetOldestParent();
+		oldestParent->MouseMove(); //
 	}
 	else
 	{
 		if(GetIsActive() == true)
 		{
 			DisableStateBit((uint32_t)ControlStateBitmask::ISACTIVE_BIT);
+
+			//when deactivation happens we have to clear these states of the control
+			this->SetIsHovered(false);
+			this->SetIsClicked(false);
+			this->SetIsFocused(false); // this function doesnt propagate downwards.
 		}
 	}
 
-	this->SubControlSetIsActive(isActive); // to propagate to subclasses
+	//this->SubControlSetIsActive(isActive); // to propagate to subclasses
 }
 
+void Control::SetIsHovered(bool isHovered)
+{
+	if(isHovered == true)
+	{
+		this->EnableStateBit((uint32_t)ControlStateBitmask::ISHOVERED_BIT);
+	}
+	else
+	{
+		this->DisableStateBit((uint32_t)ControlStateBitmask::ISHOVERED_BIT);
+		SubControlTurnOffHovered();
+	}
+
+	
+}
+
+void Control::SetIsClicked(bool isClicked)
+{
+	if(isClicked)
+	{
+		this->EnableStateBit((uint32_t)ControlStateBitmask::ISCLICKED_BIT);
+	}
+	else
+	{
+		this->DisableStateBit((uint32_t)ControlStateBitmask::ISCLICKED_BIT);
+		SubControlTurnOffClicked();
+	}
+}
 
 void Control::SetIsVisible(bool isVisible)
 {
@@ -112,6 +161,33 @@ float Control::CalculateValuebasedOnType(ValueType type, float value, float rela
 	}
 
     return 0.0f;
+}
+
+Control* Control::GetOldestParent()
+{
+	Control* lastNonNullControl = nullptr;
+    Control* currentControl = this;
+	while(currentControl != nullptr)
+	{
+		lastNonNullControl = currentControl;
+		currentControl = currentControl->Getparent();
+	}
+
+	//Now lastNonNUllControl has the oldest parent of the control this function was called on
+	return lastNonNullControl;
+}
+
+void Control::TrySetAsTopLevelControl()
+{
+	if(this->guiContext != nullptr)
+	{
+		if(this->guiContext->topLevelControl != nullptr)
+		{
+			this->guiContext->topLevelControl->SetIsActive(false);
+		}
+
+		this->guiContext->topLevelControl = this;
+	}
 }
 
 float Control::CalculateValuebasedOnType(ValueType type, float value,int axis)
@@ -418,6 +494,8 @@ void Control::RecalculatePosition()
 	_box.min = ownMinFixed / windowResolution;
 	_box.max = ownMaxFixed / windowResolution;
 
+	CalculateCutBox();
+
 }
 
 void Control::ControlUpdate()
@@ -442,6 +520,7 @@ void Control::CalculateCutBox()
 
 void Control::ControlRender()
 {
+	
 	if(this->GetIsVisible() == false) return;
 
 	bool doesCutBoxHaveAnyArea = this->DoesCutBoxHaveArea();

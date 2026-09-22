@@ -25,7 +25,7 @@ private:
 	//Note: Later on its better for this to be a universal tree, since
 	//Controls can have subcontrols implanted inside them, like a layoutpanel or some shit
 	//For now, a linear data structure can be enough since no subcontainer is needed
-	std::vector<Control*> controls;
+	//std::vector<Control*> controls;
 	
 public:
 	GUI();

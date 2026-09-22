@@ -47,7 +47,32 @@ protected:
             
         }
     }
+
+    void SubControlTurnOffHovered() override
+    {
+        for(int i=0;i<_children.size();++i)
+        {
+            _children[i]->SetIsHovered(false);
+        }
+    }
+
+    void SubControlTurnOffClicked() override
+    {
+        for(int i=0;i<_children.size();++i)
+        {
+            _children[i]->SetIsClicked(false);
+        }
+    }
+
+    void SubControlTurnOffFocused() override
+    {
+        for(int i=0;i<_children.size();++i)
+        {
+            _children[i]->SetIsFocused(false);
+        }
+    }
 };
+
 
 
 #endif

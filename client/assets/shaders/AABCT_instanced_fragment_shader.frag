@@ -20,7 +20,7 @@ void main()
     else
     {
         //lets texture
-        uvec4 textureRegistryEntry = texelFetch(uTextureRegistryBuffer,flatInstanceTextureHandle);
+        uvec4 textureRegistryEntry = texelFetch(uTextureRegistryBuffer,int(flatInstanceTextureHandle));
 
         uint startIndex = textureRegistryEntry.x;
         uint width = textureRegistryEntry.y;
@@ -30,9 +30,9 @@ void main()
 
         uint y = min(uint(vTextureCoordinates.y * float(height)), height - 1u);
 
-        uint textureIndex = startIndex + width * x + y;
+        uint textureIndex = startIndex + width * y + x;
 
-        vec4 texel = texelFetch(uTexelBuffer, textureIndex);
+        vec4 texel = texelFetch(uTexelBuffer, int(textureIndex));
 
         if(texel.a < 0.001)
         {

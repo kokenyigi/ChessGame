@@ -39,10 +39,10 @@ void GUI::Update(float deltaTime)
 {
 	m_guiContext.deltaTime = deltaTime;
 
-	for (int i = 0;i < controls.size();++i)
-	{
-		controls[i]->Update();
-	}
+	
+	
+	if(this->m_guiContext.topLevelControl != nullptr) this->m_guiContext.topLevelControl->Update();
+	
 }
 
 void GUI::Render()
@@ -53,10 +53,9 @@ void GUI::Render()
 	glDisable(GL_DEPTH_TEST);
 	*/
 
-	for (int i = 0;i < controls.size();++i)
-	{
-		controls[i]->Render();
-	}
+	
+	if(this->m_guiContext.topLevelControl != nullptr) this->m_guiContext.topLevelControl->Render();
+	
 
 	this->m_guiContext.renderer.Render();
 
@@ -72,10 +71,10 @@ void GUI::Resize(int newWindowWidth, int newWindowHeight)
 	m_guiContext.windowSize.x = newWindowWidth;
 	m_guiContext.windowSize.y = newWindowHeight;
 
-	for (int i = 0;i < controls.size();++i)
-	{
-		controls[i]->Resize(); 
-	}
+	
+	
+	if(this->m_guiContext.topLevelControl != nullptr) this->m_guiContext.topLevelControl->Resize(); 
+	
 }
 
 void GUI::MouseMove(float newMousePosX, float newMousePosY)
@@ -91,10 +90,10 @@ void GUI::MouseMove(float newMousePosX, float newMousePosY)
 
 	if(!m_guiContext.isMouseDisabled)
 	{
-		for(int i=0;i<controls.size();++i)
-		{
-			controls[i]->MouseMove();
-		}
+		
+		
+		if(this->m_guiContext.topLevelControl != nullptr) this->m_guiContext.topLevelControl->MouseMove();
+		
 	}
     
 
@@ -110,11 +109,7 @@ void GUI::MouseClick(MouseButtonType button, MouseActionType action)
 
 	if(!m_guiContext.isMouseDisabled)
 	{
-		for (int i = 0;i < controls.size();++i)
-		{
-			controls[i]->Click(button,action);
-			//std::cout<<"Calling click " << i<< ".th time\n";
-		}
+		if(this->m_guiContext.topLevelControl != nullptr) this->m_guiContext.topLevelControl->Click(button,action);
 	}
 	
 }
@@ -129,10 +124,7 @@ void GUI::MouseWheel(float amount, MouseWheelDirection direction)
 
 	if(!m_guiContext.isMouseDisabled)
 	{
-		for (int i = 0;i < controls.size();++i)
-		{
-			controls[i]->MouseWheel(amount,direction);
-		}
+		if(this->m_guiContext.topLevelControl != nullptr) this->m_guiContext.topLevelControl->MouseWheel(amount,direction);
 	}
 }
 
@@ -143,15 +135,12 @@ void GUI::KeyInput(int key,int action, int mods)
 		m_guiContext.focusedControl->VirtualKeyInput(key,action,mods);
 	}
 
-	for (int i = 0;i < controls.size();++i)
-	{
-		controls[i]->KeyInput(key,action,mods);
-	}
+	if(this->m_guiContext.topLevelControl != nullptr) this->m_guiContext.topLevelControl->KeyInput(key,action,mods);
 }
 
 void GUI::AddControl(Control* control)
 {
-	controls.push_back(control);
+	//controls.push_back(control);
 	control->SetGuiContext(GetContext());
 }
 
