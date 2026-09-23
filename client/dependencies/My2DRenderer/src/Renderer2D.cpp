@@ -44,6 +44,8 @@ bool Renderer2D::Init()
 
     texturedQuadMesh.Init(texturedQuadVertices,quadIndices);
 
+    _basicDrawCommands.resize(this->maximumBasicDrawCallCount);
+
     glGenVertexArrays(1,&_boxVao);
     glBindVertexArray(_boxVao);
 

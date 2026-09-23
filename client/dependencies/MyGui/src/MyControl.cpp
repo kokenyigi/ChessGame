@@ -187,6 +187,8 @@ void Control::TrySetAsTopLevelControl()
 		}
 
 		this->guiContext->topLevelControl = this;
+
+		this->Resize();
 	}
 }
 

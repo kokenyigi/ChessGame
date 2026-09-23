@@ -20,6 +20,14 @@ ChessApp::ChessApp()
         return;
     }
 
+	bool myOpenglResourcesResult = InitMyOpenGLResources();
+	if(myOpenglResourcesResult == false)
+	{
+		std::cout<<"[Error]: Something went wrong while initializing Opengl resources. Shutting down..\n";
+        _isRunning = false;
+        return;
+	}
+
     bool myGuiInitResult = InitMyGui();
     if(myGuiInitResult == false)
     {
@@ -27,6 +35,8 @@ ChessApp::ChessApp()
         _isRunning = false;
         return;
     }
+
+	this->_orbitCamera.Init(glm::vec3(0,0,0),glm::vec3(4,4,4),glm::vec3(0,1,0),_chessViewportSize);
 }
 
 ChessApp::~ChessApp()
@@ -35,7 +45,7 @@ ChessApp::~ChessApp()
 
 void ChessApp::Run()
 {
-    while(_isRunning)
+    while(_isRunning && !glfwWindowShouldClose(_window))
     {
         Update();
         Render();
@@ -103,6 +113,29 @@ bool ChessApp::InitGlad()
 	glEnable(GL_CULL_FACE);
 
     return true;
+}
+
+bool ChessApp::InitMyOpenGLResources()
+{
+	this->_chessViewPortTexture.Init(_chessViewportSize.x,_chessViewportSize.y);
+	this->_chessViewPortRenderBuffer.Init(_chessViewportSize.x,_chessViewportSize.y);
+
+	this->_chessViewPortFrameBuffer.Init();
+	this->_chessViewPortFrameBuffer.AttachTexture(this->_chessViewPortTexture);
+	this->_chessViewPortFrameBuffer.AttachRenderBuffer(this->_chessViewPortRenderBuffer);
+
+	this->_boardShader.Init("assets/shaders/chess_board_vertex_shader.vert","assets/shaders/chess_board_fragment_shader.frag");
+	this->_boardMesh.Load("assets/meshes/cube.obj");
+
+
+	this->_pieceShader.Init("assets/shaders/chess_piece_vertex_shader.vert","assets/shaders/chess_piece_fragment_shader.frag");
+
+	Mesh<VertexP3N3> _rookMesh;
+	_rookMesh.Load("assets/meshes/rook.obj");
+	this->_pieceMeshes.push_back(_rookMesh);
+
+    return true;
+
 }
 
 bool ChessApp::InitMyGui()
@@ -249,7 +282,7 @@ bool ChessApp::InitMyGui()
 	_buttonOnlineLobbyMenuToMultiplayerMenu.SetBaseColor(0.4,0.4,0.4);
 	_buttonOnlineLobbyMenuToMultiplayerMenu.SetHoverColor(0.5,0.5,0.5);
 	_buttonOnlineLobbyMenuToMultiplayerMenu.SetCallBackContext(this);
-	_buttonEnterOnlineLobby.SetCallback(SwapToMultiplayerMenuCallback);
+	_buttonOnlineLobbyMenuToMultiplayerMenu.SetCallback(SwapToMultiplayerMenuCallback);
 
 	_containerOnlineLobbyMenu.AddControl(&_buttonOnlineLobbyMenuToMultiplayerMenu);
 
@@ -278,6 +311,18 @@ bool ChessApp::InitMyGui()
 
 	_containerSameComputerMenu.AddControl(&_buttonSameComputerMenuToMultiplayerMenu);
 
+	_buttonStartSameComputerChessGame.SetMargin(MarginType::MARGIN_BOTTOM,150.0f);
+	_buttonStartSameComputerChessGame.SetSize(SizeType::SIZE_WIDTH, 400.0f);
+	_buttonStartSameComputerChessGame.SetSize(SizeType::SIZE_HEIGHT, 100.0f);
+	_buttonStartSameComputerChessGame.SetBaseColor(0.4,0.4,0.4);
+	_buttonStartSameComputerChessGame.SetHoverColor(0.5,0.5,0.5);
+	_buttonStartSameComputerChessGame.SetText("Start");
+	_buttonStartSameComputerChessGame.SetTextColor(1,1,1);
+	_buttonStartSameComputerChessGame.SetCallBackContext(this);
+	_buttonStartSameComputerChessGame.SetCallback(SwapToGameMenuCallback);
+
+	_containerSameComputerMenu.AddControl(&_buttonStartSameComputerChessGame);
+
 	_containerSameComputerMenu.SetMargin(MarginType::MARGIN_BOTTOM,0);
 	_containerSameComputerMenu.SetMargin(MarginType::MARGIN_LEFT,0);
 	_containerSameComputerMenu.SetMargin(MarginType::MARGIN_RIGHT,0);
@@ -286,7 +331,58 @@ bool ChessApp::InitMyGui()
 	_containerSameComputerMenu.SetHoverColor(0.3,0.3,0.3);
 
 	_gui.AddControl(&_containerSameComputerMenu);
-	//_containerSameComputerMenu.SetIsActive(false);
+	
+	/**
+	 * THe Main chess Game's menu:
+	 */
+
+	_buttonGameMenuToPreviousMenu.SetMargin(MarginType::MARGIN_TOP,10.0f);
+	_buttonGameMenuToPreviousMenu.SetMargin(MarginType::MARGIN_LEFT,10.0f);
+	_buttonGameMenuToPreviousMenu.SetSize(SizeType::SIZE_WIDTH, 50.0f);
+	_buttonGameMenuToPreviousMenu.SetSize(SizeType::SIZE_HEIGHT, 50.0f);
+	_buttonGameMenuToPreviousMenu.SetBaseColor(0.4,0.4,0.4);
+	_buttonGameMenuToPreviousMenu.SetHoverColor(0.5,0.5,0.5);
+	_buttonGameMenuToPreviousMenu.SetCallBackContext(this);
+	_buttonGameMenuToPreviousMenu.SetCallback(SwapToPreviousMenuCallback);
+
+	_containerGameMenu.AddControl(&_buttonGameMenuToPreviousMenu);
+
+	_canvasChessViewport.SetMargin(MarginType::MARGIN_TOP,0);
+	_canvasChessViewport.SetMargin(MarginType::MARGIN_LEFT,0);
+	_canvasChessViewport.SetMargin(MarginType::MARGIN_BOTTOM,0);
+	_canvasChessViewport.SetMargin(MarginType::MARGIN_RIGHT,0);
+	_canvasChessViewport.SetDynamicTexture(&this->_chessViewPortTexture);
+	_canvasChessViewport.SetCallbackContext(this);
+	_canvasChessViewport.SetResizeCallback(ViewPortCanvasResizeCallback);
+	_canvasChessViewport.SetRenderCallback(ViewPortCanvasRenderCallback);
+	_canvasChessViewport.SetMouseMoveCallback(ViewPortCanvasMouseMoveCallback);
+	_canvasChessViewport.SetMouseClickCallback(ViewPortCanvasMouseClickCallback);
+	_canvasChessViewport.SetMouseWheelCallback(ViewPortCanvasMouseWheelCallback);
+	_canvasChessViewport.SetBaseColor(1,1,1);
+	_canvasChessViewport.SetHoverColor(1,1,1);
+	_canvasChessViewport.SetClickColor(1,1,1);
+	
+
+	_container3DViewPort.AddControl(&_canvasChessViewport);
+
+	_container3DViewPort.SetMargin(MarginType::MARGIN_TOP,100.0f);
+	_container3DViewPort.SetMargin(MarginType::MARGIN_BOTTOM,100.0f);
+	_container3DViewPort.SetMargin(MarginType::MARGIN_RIGHT,100.0f);
+	_container3DViewPort.SetMargin(MarginType::MARGIN_LEFT,100.0f);
+	_container3DViewPort.SetBaseColor(0.4,0.4,0.4);
+	_container3DViewPort.SetHoverColor(0.5,0.5,0.5);
+
+	_containerGameMenu.AddControl(&_container3DViewPort);
+
+
+	_containerGameMenu.SetMargin(MarginType::MARGIN_BOTTOM,0);
+	_containerGameMenu.SetMargin(MarginType::MARGIN_LEFT,0);
+	_containerGameMenu.SetMargin(MarginType::MARGIN_RIGHT,0);
+	_containerGameMenu.SetMargin(MarginType::MARGIN_TOP,0);
+	_containerGameMenu.SetBaseColor(0.2,0.2,0.2);
+	_containerGameMenu.SetHoverColor(0.3,0.3,0.3);
+
+	_gui.AddControl(&_containerGameMenu);
 
     return true;
 }
@@ -356,6 +452,125 @@ void ChessApp::SwapToMenu(ChessAppMenuType menuType)
 			this->_containerGameMenu.SetIsActive(true);
 		break;
 	}
+}
+
+void ChessApp::ChessViewPortResize(int newWidth, int newHeight)
+{
+	if(newWidth <= 0 || newHeight <= 0) return;
+
+	this->_chessViewportSize = glm::vec2(newWidth,newHeight);
+
+	this->_chessViewPortTexture.Resize(newWidth,newHeight);
+	this->_chessViewPortRenderBuffer.Resize(newWidth,newHeight);
+
+	this->_chessViewPortFrameBuffer.AttachTexture(this->_chessViewPortTexture);
+	this->_chessViewPortFrameBuffer.AttachRenderBuffer(this->_chessViewPortRenderBuffer);
+
+	this->_orbitCamera.Resize(this->_chessViewportSize);
+
+	//camera + other stuff
+}
+
+void ChessApp::ChessViewPortRender()
+{
+	glViewport(0,0,this->_chessViewportSize.x,this->_chessViewportSize.y);
+
+	bool wasDepthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
+	if(wasDepthTestEnabled == false)
+	{
+		glEnable(GL_DEPTH_TEST);
+	}
+
+	glDepthFunc(GL_LESS);
+
+	this->_chessViewPortFrameBuffer.Bind();
+
+	glClearColor(0.5,0.8,1,1);
+
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	this->_boardShader.Bind();
+
+	this->_boardShader.SetUniform<glm::mat4>("uViewProjectionMatrix",this->_orbitCamera.GetViewXProjectionMatrix());
+	this->_boardShader.SetUniform<glm::mat4>("uWorldTransform",this->_boardTransform);
+
+	this->_boardShader.SetUniform<float>("uBoardWidth",this->_boardWidth);
+	this->_boardShader.SetUniform<float>("uBoardHeight",this->_boardHeight);
+
+	this->_boardShader.SetUniform<glm::vec3>("uDarkColor",this->_boardDarkColor);
+	this->_boardShader.SetUniform<glm::vec3>("uLightColor",this->_boardLightColor);
+
+	this->_boardMesh.Draw();
+
+	this->_boardShader.Unbind();
+
+
+
+
+	this->_pieceShader.Bind();
+
+	this->_pieceShader.SetUniform<glm::mat4>("uViewProjectionMatrix",this->_orbitCamera.GetViewXProjectionMatrix());
+	this->_pieceShader.SetUniform<glm::mat4>("uWorldTransform",glm::mat4(1.0f));
+
+	this->_pieceShader.SetUniform<glm::vec3>("uColor",this->_boardDarkColor);
+
+	this->_pieceMeshes[0].Draw();
+
+	this->_pieceShader.Unbind();
+
+	this->_chessViewPortFrameBuffer.Unbind();
+
+	if(wasDepthTestEnabled == false)
+	{
+		glDisable(GL_DEPTH_TEST);
+	}
+
+	glViewport(0,0,this->_windowSize.x,this->_windowSize.y);
+}
+
+void ChessApp::ChessViewPortMouseMove(float newX, float newY)
+{
+	_chessViewportCurrentMousePos = glm::vec2(newX,newY);
+	//std::cout<<"Mouse point: " << newX << " " << newY <<"\n"; 
+	if(this->_isDraggingChessViewport == true)
+	{
+		glm::vec2 deltaVec = _chessViewportCurrentMousePos - _chessViewportPreviousMousePos;
+		this->_orbitCamera.Rotate(deltaVec.x,deltaVec.y);
+
+		_chessViewportPreviousMousePos = _chessViewportCurrentMousePos;
+	}
+}
+
+void ChessApp::ChessViewPortMouseClick(MouseButtonType button, MouseActionType action)
+{
+	if(button == MouseButtonType::MOUSE_BUTTON_LEFT)
+	{
+		if(action == MouseActionType::MOUSE_ACTION_PRESS)
+		{
+			// if we are here that means the canvas was clicked somewhere(it might not be on it, cuz it can be focused)
+			if(_chessViewportCurrentMousePos.x > 0 && _chessViewportCurrentMousePos.x < this->_chessViewportSize.x && 
+				_chessViewportCurrentMousePos.y > 0 && _chessViewportCurrentMousePos.y < this->_chessViewportSize.y)
+			{
+				this->_isDraggingChessViewport = true;
+
+				_chessViewportPreviousMousePos = _chessViewportCurrentMousePos;
+			}
+		}
+		else if(action == MouseActionType::MOUSE_ACTION_RELEASE)
+		{
+			if(this->_isDraggingChessViewport == true)
+			{
+				this->_isDraggingChessViewport = false;
+			}
+
+
+		}
+	}
+}
+
+void ChessApp::ChessViewPortMouseWheel(float amount, MouseWheelDirection direction)
+{
+	this->_orbitCamera.Distance(amount * (direction == MouseWheelDirection::MOUSEWHEEL_FORWARD ? 1 : -1)); 
 }
 
 void ChessApp::WindowSizeCallback(GLFWwindow* window, int width, int height)
@@ -529,7 +744,7 @@ void ChessApp::ScrollCallback(GLFWwindow *window, double xoffset, double yoffset
 {
 	ChessApp* app = (ChessApp*)glfwGetWindowUserPointer(window);
 
-	app->_gui.MouseWheel(yoffset,yoffset>0 ? MouseWheelDirection::MOUSEWHEEL_FORWARD : MouseWheelDirection::MOUSEWHEEL_BACKWARD);
+	app->_gui.MouseWheel(fabsf(yoffset),yoffset>0 ? MouseWheelDirection::MOUSEWHEEL_FORWARD : MouseWheelDirection::MOUSEWHEEL_BACKWARD);
 }
 
 void ChessApp::SwapToStartMenuCallback(void *context)
@@ -576,4 +791,34 @@ void ChessApp::SwapToPreviousMenuCallback(void *context)
 	{
 		app->SwapToMenu(app->_previousMenu);
 	}
+}
+
+void ChessApp::ViewPortCanvasResizeCallback(void *context, int newWidth, int newHeight)
+{
+	ChessApp* app = (ChessApp*)context;
+	app->ChessViewPortResize(newWidth,newHeight);
+}
+
+void ChessApp::ViewPortCanvasRenderCallback(void *context)
+{
+	ChessApp* app = (ChessApp*)context;
+	app->ChessViewPortRender();
+}
+
+void ChessApp::ViewPortCanvasMouseMoveCallback(void *context, float newX, float newY)
+{
+	ChessApp* app = (ChessApp*)context;
+	app->ChessViewPortMouseMove(newX,newY);
+}
+
+void ChessApp::ViewPortCanvasMouseClickCallback(void *context, MouseButtonType button, MouseActionType action)
+{
+	ChessApp* app = (ChessApp*)context;
+	app->ChessViewPortMouseClick(button,action);
+}
+
+void ChessApp::ViewPortCanvasMouseWheelCallback(void *context, float amount, MouseWheelDirection direction)
+{
+	ChessApp* app = (ChessApp*)context;
+	app->ChessViewPortMouseWheel(amount,direction);
 }

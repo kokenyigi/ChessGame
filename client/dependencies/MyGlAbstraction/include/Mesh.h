@@ -125,6 +125,9 @@ void Mesh<VertexType, renderType>::Delete()
 template<>
 void Mesh<VertexP3N3T2,RenderType::Triangles>::Load(const std::string& filePath);
 
+template<>
+void Mesh<VertexP3N3,RenderType::Triangles>::Load(const std::string& filePath);
+
 template<typename UnwrittenVertexType, RenderType renderType>
 void Mesh<UnwrittenVertexType, renderType>::Load(const std::string& filePath)
 {
