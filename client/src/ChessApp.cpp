@@ -130,9 +130,29 @@ bool ChessApp::InitMyOpenGLResources()
 
 	this->_pieceShader.Init("assets/shaders/chess_piece_vertex_shader.vert","assets/shaders/chess_piece_fragment_shader.frag");
 
-	Mesh<VertexP3N3> _rookMesh;
-	_rookMesh.Load("assets/meshes/rook.obj");
-	this->_pieceMeshes.push_back(_rookMesh);
+	Mesh<VertexP3N3> pawnMesh;
+	pawnMesh.Load("assets/meshes/pawn.obj");
+	this->_pieceMeshes.push_back(pawnMesh);
+	
+	Mesh<VertexP3N3> bishopMesh;
+	bishopMesh.Load("assets/meshes/bishop.obj");
+	this->_pieceMeshes.push_back(bishopMesh);
+	
+	Mesh<VertexP3N3> horseMesh;
+	horseMesh.Load("assets/meshes/horse.obj");
+	this->_pieceMeshes.push_back(horseMesh);
+	
+	Mesh<VertexP3N3> rookMesh;
+	rookMesh.Load("assets/meshes/rook.obj");
+	this->_pieceMeshes.push_back(rookMesh);
+	
+	Mesh<VertexP3N3> queenMesh;
+	queenMesh.Load("assets/meshes/queen.obj");
+	this->_pieceMeshes.push_back(queenMesh);
+	
+	Mesh<VertexP3N3> kingMesh;
+	kingMesh.Load("assets/meshes/king.obj");
+	this->_pieceMeshes.push_back(kingMesh);
 
     return true;
 

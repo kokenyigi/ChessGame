@@ -18,6 +18,8 @@
 
 #include "OrbitCamera.h"
 
+#include "ChessGame.h"
+
 enum class ChessAppMenuType
 {
     MENU_NONE = 0,
@@ -119,6 +121,8 @@ private:
 
     Shader _pieceShader;
     std::vector<Mesh<VertexP3N3>> _pieceMeshes;
+
+    ChessGame _chessGame;
     
 public:
     ChessApp();
