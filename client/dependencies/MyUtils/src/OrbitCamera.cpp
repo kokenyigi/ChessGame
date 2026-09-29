@@ -23,11 +23,12 @@ void OrbitCamera::Resize(const glm::vec2 &newDimensions)
 
 void OrbitCamera::Rotate(float deltaX, float deltaY)
 {
-    std::cout<<"Camera Delta: x: " << deltaX << " y: " << deltaY << "\n";
+    //std::cout<<"Camera Delta: x: " << deltaX << " y: " << deltaY << "\n";
 
-    this->_yaw -= deltaX * _rotatingSensitivity;
+    this->_yaw += deltaX * _rotatingSensitivity;
+    this->_yaw = glm::mod(this->_yaw,360.0f);
 
-    float newPitch = _pitch + deltaY * _rotatingSensitivity;
+    float newPitch = _pitch - deltaY * _rotatingSensitivity;
     if(newPitch < 1.0f)
     {
         newPitch = 1.0f;
@@ -53,7 +54,7 @@ void OrbitCamera::Distance(float deltaValue)
 
 void OrbitCamera::CalculateYawAndPitchAndDistance()
 {
-    glm::vec3 diffVec = this->_fixatePoint - this->_cameraPosition;
+    glm::vec3 diffVec =  this->_cameraPosition - this->_fixatePoint;
     float lengthOfDiffVec = glm::length(diffVec);
     glm::vec3 normalizedFront = diffVec / lengthOfDiffVec;
 
@@ -64,11 +65,11 @@ void OrbitCamera::CalculateYawAndPitchAndDistance()
 
 void OrbitCamera::CalculatePosition()
 {
-    float inversePitch = 180.0f - _pitch;
-    float inverseYaw = -_yaw;
+    //float inversePitch = 180.0f - _pitch;
+    //float inverseYaw = -_yaw;
 
-    float inversePitchRad  = glm::radians(inversePitch);
-    float inverseYawRad = glm::radians(inverseYaw);
+    float inversePitchRad  = glm::radians(_pitch);
+    float inverseYawRad = glm::radians(_yaw);
 
     glm::vec3 diffVec;
     diffVec.x = _distanceToFixatePoint * glm::sin(inversePitchRad) * glm::cos(inverseYawRad);

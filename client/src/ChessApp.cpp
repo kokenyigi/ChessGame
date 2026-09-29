@@ -520,6 +520,10 @@ void ChessApp::ChessViewPortRender()
 	this->_boardShader.SetUniform<glm::vec3>("uDarkColor",this->_boardDarkColor);
 	this->_boardShader.SetUniform<glm::vec3>("uLightColor",this->_boardLightColor);
 
+	//temp
+	this->_boardShader.SetUniform<int>("uTempIsAPositionPicked",this->isAPositionPicked ? 1 : 0);
+	this->_boardShader.SetUniform<glm::vec3>("uTempPickedPosition",this->pickedPosition);
+
 	this->_boardMesh.Draw();
 
 	this->_boardShader.Unbind();
@@ -530,11 +534,40 @@ void ChessApp::ChessViewPortRender()
 	this->_pieceShader.Bind();
 
 	this->_pieceShader.SetUniform<glm::mat4>("uViewProjectionMatrix",this->_orbitCamera.GetViewXProjectionMatrix());
-	this->_pieceShader.SetUniform<glm::mat4>("uWorldTransform",glm::mat4(1.0f));
+	this->_pieceShader.SetUniform<int>("uTempIsAPositionPicked",this->isAPositionPicked ? 1 : 0);
+	this->_pieceShader.SetUniform<glm::vec3>("uTempPickedPosition",this->pickedPosition);
+	for(int index = 0;index < 64 ;++index)
+	{
+		ChessTileViewData tileViewData = this->_chessGame.GetTileViewData(index);
+		if(tileViewData.piece != PIECE_NONE)
+		{
+			glm::vec2 currentPositionOfPiece = GetViewPositionFromChessGameIndex(index);
+			glm::mat4 currentWorldTransform = glm::translate(glm::mat4(1.0f),glm::vec3(currentPositionOfPiece.x,0,currentPositionOfPiece.y)) *
+				glm::scale(glm::mat4(1.0f),glm::vec3(_pieceSize));
+			
 
-	this->_pieceShader.SetUniform<glm::vec3>("uColor",this->_boardDarkColor);
+			glm::vec3 pieceColor = glm::vec3(1.0f);
+			if(tileViewData.color == COLOR_LIGHT)
+			{
+				pieceColor = _pieceLigthColor;
+				currentWorldTransform = currentWorldTransform * _lightBaseRotationTransform;
+			}
+			else
+			{
+				pieceColor = _pieceDarkColor;
+				currentWorldTransform = currentWorldTransform * _darkBaseRotationTransform;
+			}
 
-	this->_pieceMeshes[0].Draw();
+			this->_pieceShader.SetUniform<glm::mat4>("uWorldTransform",currentWorldTransform);
+			this->_pieceShader.SetUniform<glm::vec3>("uColor",pieceColor);
+
+			this->_pieceMeshes[tileViewData.piece].Draw();
+		}
+	}
+	//this->_pieceShader.SetUniform<glm::mat4>("uWorldTransform",glm::mat4(1.0f));
+	//this->_pieceShader.SetUniform<glm::vec3>("uColor",this->_boardDarkColor);
+
+	//this->_pieceMeshes[0].Draw();
 
 	this->_pieceShader.Unbind();
 
@@ -571,6 +604,8 @@ void ChessApp::ChessViewPortMouseClick(MouseButtonType button, MouseActionType a
 			if(_chessViewportCurrentMousePos.x > 0 && _chessViewportCurrentMousePos.x < this->_chessViewportSize.x && 
 				_chessViewportCurrentMousePos.y > 0 && _chessViewportCurrentMousePos.y < this->_chessViewportSize.y)
 			{
+				PickChessViewPort(_chessViewportCurrentMousePos.x,_chessViewportCurrentMousePos.y);
+
 				this->_isDraggingChessViewport = true;
 
 				_chessViewportPreviousMousePos = _chessViewportCurrentMousePos;
@@ -591,6 +626,34 @@ void ChessApp::ChessViewPortMouseClick(MouseButtonType button, MouseActionType a
 void ChessApp::ChessViewPortMouseWheel(float amount, MouseWheelDirection direction)
 {
 	this->_orbitCamera.Distance(amount * (direction == MouseWheelDirection::MOUSEWHEEL_FORWARD ? 1 : -1)); 
+}
+
+glm::vec2 ChessApp::GetViewPositionFromChessGameIndex(int index)
+{
+	if(index < 0 || index >= 64) return glm::vec2(0,0);
+
+	float boardEighthWidth = this->_boardWidth * 0.125f;
+    glm::vec2 bottomLeft = glm::vec2( -boardEighthWidth * 3.5f, -boardEighthWidth * 3.5f);
+
+	glm::uvec2 positionIndicies = glm::uvec2(index / 8, index % 8);
+	return bottomLeft + glm::vec2(positionIndicies) * glm::vec2(boardEighthWidth,boardEighthWidth);
+}
+
+ViewportPickResult ChessApp::PickChessViewPort(int x, int y)
+{
+	ViewportPickResult retval;
+    if(x < 0 || x >= this->_chessViewportSize.x || y < 0 || y > this->_chessViewportSize.y) return retval;
+
+	//now we have to read out informations from the depth buffer of our framebuffer(idk how)
+	float depthValue = this->_chessViewPortFrameBuffer.GetDepthValueAt(x,this->_chessViewportSize.y - 1 - y);
+
+	float ndcX = (float)x / this->_chessViewportSize.x * 2.0f - 1.0f;
+	float ndcY = ( this->_chessViewportSize.y - (float)y) / this->_chessViewportSize.y * 2.0f - 1.0f;
+	float ndcZ = depthValue * 2.0f - 1.0f;
+
+	std::cout<<"NDC: x: " << ndcX << " y: " << ndcY << " z: " << ndcZ << "\n";
+
+	return retval;
 }
 
 void ChessApp::WindowSizeCallback(GLFWwindow* window, int width, int height)

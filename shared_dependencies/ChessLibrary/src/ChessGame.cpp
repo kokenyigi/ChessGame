@@ -13,6 +13,13 @@ ChessTileViewData ChessGame::GetTileViewData(const ChessPositionData position)
     return this->_boardView[indexFromPosition];
 }
 
+ChessTileViewData ChessGame::GetTileViewData(const int index)
+{
+    if(index < 0 || index >= 64) return {PIECE_NONE, COLOR_NONE};
+
+    return this->_boardView[index];
+}
+
 void ChessGame::SetupStartState()
 {
     for(int color = 0 ; color < 2 ; ++color)
@@ -45,11 +52,11 @@ void ChessGame::SetupStartState()
     this->_state.piecePositions[COLOR_DARK][PIECE_ROOK] |= CreateBitmaskFromIndex(63u);
 
     //horses
-    this->_state.piecePositions[COLOR_LIGHT][PIECE_ROOK] |= CreateBitmaskFromIndex(1u);
-    this->_state.piecePositions[COLOR_LIGHT][PIECE_ROOK] |= CreateBitmaskFromIndex(6u);
+    this->_state.piecePositions[COLOR_LIGHT][PIECE_HORSE] |= CreateBitmaskFromIndex(1u);
+    this->_state.piecePositions[COLOR_LIGHT][PIECE_HORSE] |= CreateBitmaskFromIndex(6u);
 
-    this->_state.piecePositions[COLOR_DARK][PIECE_ROOK] |= CreateBitmaskFromIndex(57u);
-    this->_state.piecePositions[COLOR_DARK][PIECE_ROOK] |= CreateBitmaskFromIndex(62u);
+    this->_state.piecePositions[COLOR_DARK][PIECE_HORSE] |= CreateBitmaskFromIndex(57u);
+    this->_state.piecePositions[COLOR_DARK][PIECE_HORSE] |= CreateBitmaskFromIndex(62u);
 
 
     //bishops

@@ -9,10 +9,24 @@ uniform float uBoardHeight;
 uniform vec3 uDarkColor;
 uniform vec3 uLightColor;
 
+//temp
+uniform int uTempIsAPositionPicked;
+uniform vec3 uTempPickedPosition;
+
 out vec4 fragColor;
 
 void main()
 {
+    if(uTempIsAPositionPicked != 0)
+    {
+        if(length(vPosition - uTempPickedPosition) < 0.3f)
+        {
+            fragColor = vec4(0,1,0,1);
+            return;
+        }
+    }
+
+
     float halfWidth = uBoardWidth * 0.5f;
     vec2 checkPatternValue = vPosition.xz + vec2(halfWidth,halfWidth);
 
@@ -22,11 +36,11 @@ void main()
     int checkValue = indexValue.y + indexValue.x ;
     if(checkValue % 2 == 0)
     {
-        fragColor = vec4(uLightColor,1);
+        fragColor = vec4(uDarkColor,1);
     }
     else
     {
-        fragColor = vec4(uDarkColor,1);
+        fragColor = vec4(uLightColor,1);
     }
     
     

@@ -34,3 +34,16 @@ void FrameBuffer::Unbind()
 {
     GLCall(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 }
+
+float FrameBuffer::GetDepthValueAt(int x, int y)
+{
+	glBindFramebuffer(GL_READ_FRAMEBUFFER,this->m_fboID);
+
+    glReadBuffer(GL_NONE);
+    float depthValue = 0.0f;
+    glReadPixels(x,y,1,1,GL_DEPTH_COMPONENT,GL_FLOAT,&depthValue);
+
+    glBindFramebuffer(GL_READ_FRAMEBUFFER,0);
+
+    return depthValue;
+}

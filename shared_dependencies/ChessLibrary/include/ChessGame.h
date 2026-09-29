@@ -81,12 +81,12 @@ public:
     void StartNewGame() {SetupStartState(); SetupViewBoardBasedOnState();}
 
 
-    static uint8_t GetIndexFromPosition(const ChessPositionData position);
+    static uint8_t GetIndexFromPosition(const ChessPositionData position){return position.file + position.rank * 8;}
     static ChessPositionData GetPositionFromIndex(const uint8_t index);
-    static uint64_t CreateBitmaskFromIndex(const uint8_t index){return (1ul << index);}
+    static uint64_t CreateBitmaskFromIndex(const uint8_t index){return (1ull << index);}
 
     ChessTileViewData GetTileViewData(const ChessPositionData position);
-
+    ChessTileViewData GetTileViewData(const int index);
 private:
     void SetupStartState();
 

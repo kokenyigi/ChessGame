@@ -22,6 +22,8 @@ public:
     void Bind();
     void Unbind();
 
+    float GetDepthValueAt(int x, int y);
+
     void Delete();
 private:
 };

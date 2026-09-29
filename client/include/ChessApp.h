@@ -31,6 +31,12 @@ enum class ChessAppMenuType
     MENU_GAME = 6
 };
 
+struct ViewportPickResult
+{
+    bool wasAnythingActuallyThere = false;
+    glm::vec3 pickedVirtualCoordinates = glm::vec3(0,0,0);
+};
+
 
 class ChessApp
 {
@@ -98,6 +104,8 @@ private:
     ChessAppMenuType _previousMenu = ChessAppMenuType::MENU_NONE;
     ChessAppMenuType _currentMenu = ChessAppMenuType::MENU_START;
 
+
+
     // Variables related to the chess viewport
     glm::vec2 _chessViewportSize = glm::vec2(100,100);
 
@@ -113,16 +121,25 @@ private:
     Shader _boardShader;
     Mesh<VertexP3N3> _boardMesh;
     const float _boardWidth = 8.0f;
-    const float _boardHeight = 1.0f;
+    const float _boardHeight = 0.5f;
     glm::vec3 _boardLightColor = glm::vec3(0.8,0.8,0.8);
     glm::vec3 _boardDarkColor = glm::vec3(0.2,0.2,0.2);
     glm::mat4 _boardTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0,-_boardHeight/2,0)) *
         glm::scale(glm::mat4(1.0f), glm::vec3(_boardWidth,_boardHeight,_boardWidth));
 
+    glm::vec3 _pieceLigthColor = glm::vec3(0.85,0.85,0.85);
+    glm::vec3 _pieceDarkColor = glm::vec3(0.25,0.25,0.25);
+    float _pieceSize = 0.7f;
+    glm::mat4 _lightBaseRotationTransform = glm::mat4(1.0f);
+    glm::mat4 _darkBaseRotationTransform = glm::rotate(glm::mat4(1.0f),glm::radians(180.0f),glm::vec3(0,1,0));
     Shader _pieceShader;
     std::vector<Mesh<VertexP3N3>> _pieceMeshes;
 
     ChessGame _chessGame;
+
+    //picking related variables
+    bool isAPositionPicked = false;
+    glm::vec3 pickedPosition = glm::vec3(0,0,0);
     
 public:
     ChessApp();
@@ -179,6 +196,9 @@ private:
     void ChessViewPortMouseWheel(float amount, MouseWheelDirection direction);
 
 
+    glm::vec2 GetViewPositionFromChessGameIndex(int index);
+
+    ViewportPickResult PickChessViewPort(int x, int y);
 };
 
 #endif
