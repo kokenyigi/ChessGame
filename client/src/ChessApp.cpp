@@ -37,6 +37,8 @@ ChessApp::ChessApp()
     }
 
 	this->_orbitCamera.Init(glm::vec3(0,0,0),glm::vec3(4,4,4),glm::vec3(0,1,0),_chessViewportSize);
+
+	this->_currentMainState = MainStateType::MAINSTATE_START;
 }
 
 ChessApp::~ChessApp()
@@ -430,6 +432,97 @@ void ChessApp::Render()
     glfwSwapBuffers(_window);
 }
 
+void ChessApp::SetMainStateAs(MainStateType newMainState)
+{
+	this->_previousMainState = this->_currentMainState;
+	this->_currentMainState = newMainState;
+}
+
+void ChessApp::TryEnterSinglePlayerMainState()
+{
+	if(this->_currentMainState == MainStateType::MAINSTATE_SINGLEPLAYER || 
+		(this->_currentMainState != MainStateType::MAINSTATE_START && this->_currentMainState != MainStateType::MAINSTATE_GAME_PLAYING)) 
+	{
+		std::cout << "[App]: cant enter singleplayer state from this state\n";
+		return;
+	}
+
+	SetMainStateAs(MainStateType::MAINSTATE_SINGLEPLAYER);
+	this->_containerSinglePlayerMenu.SetIsActive(true);
+}
+
+void ChessApp::TryEnterMultiPlayerSelectionMainState()
+{
+	if(this->_currentMainState == MainStateType::MAINSTATE_MULTIPLAYER || 
+		(this->_currentMainState != MainStateType::MAINSTATE_START && 
+		this->_currentMainState != MainStateType::MAINSTATE_ONLINE_OPPONENT_FINDING_LOBBY && 
+		this->_currentMainState != MainStateType::MAINSTATE_SAME_COMPUTER_GAME_CONFIGURATION))
+	{
+		std::cout << "[App]: cant enter multiplayer state from this state\n";
+		return;
+	}
+
+	SetMainStateAs(MainStateType::MAINSTATE_MULTIPLAYER);
+	this->_containerMultiplayerMenu.SetIsActive(true);
+}
+
+void ChessApp::TryEnterStartMainState()
+{
+	if(this->_currentMainState == MainStateType::MAINSTATE_START || 
+		(this->_currentMainState != MainStateType::MAINSTATE_MULTIPLAYER && 
+		this->_currentMainState != MainStateType::MAINSTATE_SINGLEPLAYER))
+	{
+		std::cout << "[App]: cant enter start state from this state\n";
+		return;
+	}
+
+	SetMainStateAs(MainStateType::MAINSTATE_START);
+	this->_containerStartMenu.SetIsActive(true);
+}
+
+void ChessApp::TryEnterOnlineOpponentLobbyMainState()
+{
+	if(this->_currentMainState == MainStateType::MAINSTATE_ONLINE_OPPONENT_FINDING_LOBBY || 
+		(this->_currentMainState != MainStateType::MAINSTATE_GAME_PLAYING && 
+		this->_currentMainState != MainStateType::MAINSTATE_MULTIPLAYER))
+	{
+		std::cout << "[App]: cant enter Online opponent finding lobby state from this state\n";
+		return;
+	}
+
+	SetMainStateAs(MainStateType::MAINSTATE_ONLINE_OPPONENT_FINDING_LOBBY);
+	this->_containerOnlineLobbyMenu.SetIsActive(true);
+}
+
+void ChessApp::TryEnterSameComputerOpponentMainState()
+{
+	if(this->_currentMainState == MainStateType::MAINSTATE_SAME_COMPUTER_GAME_CONFIGURATION || 
+		(this->_currentMainState != MainStateType::MAINSTATE_GAME_PLAYING && 
+		this->_currentMainState != MainStateType::MAINSTATE_MULTIPLAYER))
+	{
+		std::cout << "[App]: cant enter same computer game config state from this state\n";
+		return;
+	}
+
+	SetMainStateAs(MainStateType::MAINSTATE_SAME_COMPUTER_GAME_CONFIGURATION);
+	this->_containerSameComputerMenu.SetIsActive(true);
+}
+
+void ChessApp::TryEnterGamePlayingMainState()
+{
+	if(this->_currentMainState == MainStateType::MAINSTATE_GAME_PLAYING || 
+		(this->_currentMainState != MainStateType::MAINSTATE_ONLINE_OPPONENT_FINDING_LOBBY && 
+		this->_currentMainState != MainStateType::MAINSTATE_SAME_COMPUTER_GAME_CONFIGURATION && 
+		this->_currentMainState != MainStateType::MAINSTATE_SINGLEPLAYER))
+	{
+		std::cout << "[App]: cant enter Game playing state from this state\n";
+		return;
+	}
+
+	SetMainStateAs(MainStateType::MAINSTATE_GAME_PLAYING);
+	this->_containerGameMenu.SetIsActive(true);
+}
+
 void ChessApp::SwapToMenu(ChessAppMenuType menuType)
 {
 	if(this->_currentMenu == menuType) return;
@@ -520,9 +613,19 @@ void ChessApp::ChessViewPortRender()
 	this->_boardShader.SetUniform<glm::vec3>("uDarkColor",this->_boardDarkColor);
 	this->_boardShader.SetUniform<glm::vec3>("uLightColor",this->_boardLightColor);
 
-	//temp
-	this->_boardShader.SetUniform<int>("uTempIsAPositionPicked",this->isAPositionPicked ? 1 : 0);
-	this->_boardShader.SetUniform<glm::vec3>("uTempPickedPosition",this->pickedPosition);
+	glm::uvec2 glowingTileBitmask = glm::uvec2(0u);
+	if(this->isAPositionPicked == true)
+	{
+		unsigned int indexOfCurrentlySelectedTile = GetChessGameIndexFromVirtualPosition(this->pickedPosition.x,pickedPosition.z);
+		if(indexOfCurrentlySelectedTile >= 0 && indexOfCurrentlySelectedTile < 64)
+		{
+			uint64_t bitmaskOfGlowingTiles = ChessGame::CreateBitmaskFromIndex(indexOfCurrentlySelectedTile);
+			glowingTileBitmask = ChessApp::CreateUvec2FromUint64t(bitmaskOfGlowingTiles);
+		}
+	}
+
+	this->_boardShader.SetUniform<glm::uvec2>("uGlowingTileIndicesBitmask",glowingTileBitmask);
+	
 
 	this->_boardMesh.Draw();
 
@@ -534,8 +637,7 @@ void ChessApp::ChessViewPortRender()
 	this->_pieceShader.Bind();
 
 	this->_pieceShader.SetUniform<glm::mat4>("uViewProjectionMatrix",this->_orbitCamera.GetViewXProjectionMatrix());
-	this->_pieceShader.SetUniform<int>("uTempIsAPositionPicked",this->isAPositionPicked ? 1 : 0);
-	this->_pieceShader.SetUniform<glm::vec3>("uTempPickedPosition",this->pickedPosition);
+	
 	for(int index = 0;index < 64 ;++index)
 	{
 		ChessTileViewData tileViewData = this->_chessGame.GetTileViewData(index);
@@ -604,7 +706,16 @@ void ChessApp::ChessViewPortMouseClick(MouseButtonType button, MouseActionType a
 			if(_chessViewportCurrentMousePos.x > 0 && _chessViewportCurrentMousePos.x < this->_chessViewportSize.x && 
 				_chessViewportCurrentMousePos.y > 0 && _chessViewportCurrentMousePos.y < this->_chessViewportSize.y)
 			{
-				PickChessViewPort(_chessViewportCurrentMousePos.x,_chessViewportCurrentMousePos.y);
+				ViewportPickResult pickResult = PickChessViewPort(_chessViewportCurrentMousePos.x,_chessViewportCurrentMousePos.y);
+				if(pickResult.wasAnythingActuallyThere == true)
+				{
+					this->isAPositionPicked = true;
+					this->pickedPosition = pickResult.pickedVirtualCoordinates;
+				}
+				else
+				{
+					this->isAPositionPicked = false;
+				}
 
 				this->_isDraggingChessViewport = true;
 
@@ -647,13 +758,41 @@ ViewportPickResult ChessApp::PickChessViewPort(int x, int y)
 	//now we have to read out informations from the depth buffer of our framebuffer(idk how)
 	float depthValue = this->_chessViewPortFrameBuffer.GetDepthValueAt(x,this->_chessViewportSize.y - 1 - y);
 
+	if(fabsf(depthValue - 1.0f) < 0.0000001f) return retval; // we hit bg
+
 	float ndcX = (float)x / this->_chessViewportSize.x * 2.0f - 1.0f;
 	float ndcY = ( this->_chessViewportSize.y - (float)y) / this->_chessViewportSize.y * 2.0f - 1.0f;
 	float ndcZ = depthValue * 2.0f - 1.0f;
 
-	std::cout<<"NDC: x: " << ndcX << " y: " << ndcY << " z: " << ndcZ << "\n";
+	//std::cout<<"NDC: x: " << ndcX << " y: " << ndcY << " z: " << ndcZ << "\n";
+
+	glm::vec4 fullNdcPosition = glm::vec4(ndcX,ndcY,ndcZ,1.0f);
+	glm::vec4 inverseTransformedPosition = glm::inverse(this->_orbitCamera.GetViewXProjectionMatrix()) * fullNdcPosition;
+	inverseTransformedPosition /= inverseTransformedPosition.w; // have to do a homogenous division
+
+	glm::vec3 pickedPositionInWorldSpace = glm::vec3(inverseTransformedPosition);
+
+	retval.wasAnythingActuallyThere = true;
+	retval.pickedVirtualCoordinates = pickedPositionInWorldSpace;
 
 	return retval;
+}
+
+unsigned int ChessApp::GetChessGameIndexFromVirtualPosition(float x, float z)
+{
+	float halfWidth = this->_boardWidth * 0.5f;
+	float eighthWidth = this->_boardWidth * 0.125f;
+	if(x < -halfWidth || x > halfWidth || z < -halfWidth || z > halfWidth) return 64u; // 64 is the impossible index
+
+	glm::vec2 pos = glm::vec2(x,z);
+	pos += glm::vec2(halfWidth);
+	pos /= eighthWidth;
+
+	glm::uvec2 posIndices = glm::uvec2(pos);
+	glm::uvec2 clampedPosIndices = glm::clamp(posIndices,glm::uvec2(0,0),glm::uvec2(7,7));
+	unsigned int index = clampedPosIndices.x + clampedPosIndices.y * 8;
+
+    return index;
 }
 
 void ChessApp::WindowSizeCallback(GLFWwindow* window, int width, int height)
@@ -833,46 +972,56 @@ void ChessApp::ScrollCallback(GLFWwindow *window, double xoffset, double yoffset
 void ChessApp::SwapToStartMenuCallback(void *context)
 {
 	ChessApp* app = (ChessApp*)context;
-	app->SwapToMenu(ChessAppMenuType::MENU_START);
+	app->TryEnterStartMainState();
 }
 
 void ChessApp::SwapToSinglePlayerMenuCallback(void *context)
 {
 	ChessApp* app = (ChessApp*)context;
-	app->SwapToMenu(ChessAppMenuType::MENU_SINGLEPLAYER);
+	app->TryEnterSinglePlayerMainState();
 }
 
 void ChessApp::SwapToMultiplayerMenuCallback(void *context)
 {
 	ChessApp* app = (ChessApp*)context;
-	app->SwapToMenu(ChessAppMenuType::MENU_MULTIPLAYER);
+	app->TryEnterMultiPlayerSelectionMainState();
 }
 
 void ChessApp::SwapToOnlineLobbyMenuCallback(void *context)
 {
 	ChessApp* app = (ChessApp*)context;
-	app->SwapToMenu(ChessAppMenuType::MENU_ONLINE_LOBBY);
+	app->TryEnterOnlineOpponentLobbyMainState();
 }
 
 void ChessApp::SwapToSameComputerMenuCallback(void *context)
 {
 	ChessApp* app = (ChessApp*)context;
-	app->SwapToMenu(ChessAppMenuType::MENU_SAME_COMPUTER);
+	app->TryEnterSameComputerOpponentMainState();
 }
 
 void ChessApp::SwapToGameMenuCallback(void *context)
 {
 	ChessApp* app = (ChessApp*)context;
-	
-	app->SwapToMenu(ChessAppMenuType::MENU_GAME);
+	app->TryEnterGamePlayingMainState();
 }
 
 void ChessApp::SwapToPreviousMenuCallback(void *context)
 {
 	ChessApp* app = (ChessApp*)context;
-	if(app->_previousMenu != ChessAppMenuType::MENU_NONE)
+	switch(app->_previousMainState)
 	{
-		app->SwapToMenu(app->_previousMenu);
+		case MainStateType::MAINSTATE_SINGLEPLAYER:
+			app->TryEnterSinglePlayerMainState();
+		break;
+		case MainStateType::MAINSTATE_ONLINE_OPPONENT_FINDING_LOBBY:
+			app->TryEnterOnlineOpponentLobbyMainState();
+		break;
+		case MainStateType::MAINSTATE_SAME_COMPUTER_GAME_CONFIGURATION:
+			app->TryEnterSameComputerOpponentMainState();
+		break;
+		default:
+			std::cout<<"[App]: Can't go back to this state from this state.\n";
+		break;
 	}
 }
 
@@ -904,4 +1053,13 @@ void ChessApp::ViewPortCanvasMouseWheelCallback(void *context, float amount, Mou
 {
 	ChessApp* app = (ChessApp*)context;
 	app->ChessViewPortMouseWheel(amount,direction);
+}
+
+glm::uvec2 ChessApp::CreateUvec2FromUint64t(const uint64_t &bitmask)
+{
+    glm::uvec2 retval = glm::uvec2(0);
+	retval.x = (uint32_t)(bitmask & 0xFFFFFFFF);
+	retval.y = (uint32_t)(bitmask >> 32u);
+
+	return retval;
 }

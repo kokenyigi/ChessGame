@@ -9,29 +9,45 @@ uniform float uBoardHeight;
 uniform vec3 uDarkColor;
 uniform vec3 uLightColor;
 
-//temp
-uniform int uTempIsAPositionPicked;
-uniform vec3 uTempPickedPosition;
+// this uniform is 2 * 32 bits of flags for each board position
+uniform uvec2 uGlowingTileIndicesBitmask;
 
 out vec4 fragColor;
 
-void main()
+//assumes index is in [0 ,63]
+uvec2 CreateBitmaskFromIndex(uint index)
 {
-    if(uTempIsAPositionPicked != 0)
+    uvec2 retval = uvec2(0u);
+
+    if(index < 32u)
     {
-        if(length(vPosition - uTempPickedPosition) < 0.3f)
-        {
-            fragColor = vec4(0,1,0,1);
-            return;
-        }
+        retval.x = 1u << index;
+    }
+    else // index is in second coordinate
+    {
+        retval.y = 1u << (index - 32u);
     }
 
+    return retval;
+}
 
+void main()
+{
     float halfWidth = uBoardWidth * 0.5f;
     vec2 checkPatternValue = vPosition.xz + vec2(halfWidth,halfWidth);
 
     float eighthWidth = uBoardWidth * 0.125f;
     ivec2 indexValue = ivec2(checkPatternValue / eighthWidth - 0.0001f);
+
+    indexValue = clamp(indexValue,ivec2(0,0),ivec2(7,7));
+
+    uint indexOfTile = uint(indexValue.x + indexValue.y * 8);
+    uvec2 bitmaskOfTile = CreateBitmaskFromIndex(indexOfTile);
+    if(any((bitmaskOfTile & uGlowingTileIndicesBitmask) != uvec2(0u)))
+    {
+        fragColor = vec4(0,1,0,1);
+        return;
+    }
 
     int checkValue = indexValue.y + indexValue.x ;
     if(checkValue % 2 == 0)

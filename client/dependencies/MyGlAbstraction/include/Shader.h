@@ -79,6 +79,14 @@ inline void Shader::SetUniform<float>(const std::string& name, const float& valu
 	GLCall(glUniform1f(location, value));
 }
 
+template<>
+inline void Shader::SetUniform<glm::uvec2>(const std::string& name, const glm::uvec2& value) const
+{
+	int location = GetUniformLocation(name);
+	if (location == -1)return;
+	GLCall(glUniform2uiv(location,1, glm::value_ptr(value)));
+}
+
 
 
 template<typename UnwrittenType>

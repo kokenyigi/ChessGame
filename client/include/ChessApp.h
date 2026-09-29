@@ -31,6 +31,32 @@ enum class ChessAppMenuType
     MENU_GAME = 6
 };
 
+enum class MainStateType
+{
+    MAINSTATE_NONE = 0,
+    MAINSTATE_START = 1,
+    MAINSTATE_SINGLEPLAYER = 2,
+    MAINSTATE_MULTIPLAYER = 3,
+    MAINSTATE_ONLINE_OPPONENT_FINDING_LOBBY = 4,
+    MAINSTATE_SAME_COMPUTER_GAME_CONFIGURATION = 5,
+    MAINSTATE_GAME_PLAYING = 6
+};
+
+enum class OpponentType
+{
+    OPPONENT_NONE = 0,
+    OPPONENT_SAME_COMPUTER_PLAYER = 1,
+    OPPONENT_ONLINE_PLAYER = 2,
+    OPPONENT_BOT = 3
+};
+
+enum class InteractionColorType
+{
+    COLOR_NONE = 0,
+    COLOR_LIGHT = 1,
+    COLOR_DARK = 2
+};
+
 struct ViewportPickResult
 {
     bool wasAnythingActuallyThere = false;
@@ -58,6 +84,13 @@ private:
     glm::uvec2 _windowSize = glm::uvec2(1000,800);
     glm::vec2 _previousMousePos = glm::vec2(0,0);
     glm::vec2 _currentMousePos = glm::vec2(0,0);
+
+    /**
+     * The Application is basically a state machine(like most programs) and it has main states and substates
+     * (For example: online lobby main state can have multiple substates)
+     */
+    MainStateType _previousMainState = MainStateType::MAINSTATE_NONE;
+    MainStateType _currentMainState = MainStateType::MAINSTATE_NONE;
 
     //Gui member variables
     GUI _gui;
@@ -124,8 +157,7 @@ private:
     const float _boardHeight = 0.5f;
     glm::vec3 _boardLightColor = glm::vec3(0.8,0.8,0.8);
     glm::vec3 _boardDarkColor = glm::vec3(0.2,0.2,0.2);
-    glm::mat4 _boardTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0,-_boardHeight/2,0)) *
-        glm::scale(glm::mat4(1.0f), glm::vec3(_boardWidth,_boardHeight,_boardWidth));
+    glm::mat4 _boardTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0,-_boardHeight/2,0)) * glm::scale(glm::mat4(1.0f), glm::vec3(_boardWidth,_boardHeight,_boardWidth));
 
     glm::vec3 _pieceLigthColor = glm::vec3(0.85,0.85,0.85);
     glm::vec3 _pieceDarkColor = glm::vec3(0.25,0.25,0.25);
@@ -176,6 +208,8 @@ public:
     static void ViewPortCanvasMouseClickCallback(void* context, MouseButtonType button, MouseActionType action);
     static void ViewPortCanvasMouseWheelCallback(void* context, float amount, MouseWheelDirection direction);
 
+    static glm::uvec2 CreateUvec2FromUint64t(const uint64_t& bitmask);
+
 private:
 
     bool InitGlfw3();
@@ -185,6 +219,18 @@ private:
 
     void Update();
     void Render();
+
+    //These functions are responsible for swapping between the main menus, they check conditions, and properly setup the valid state
+    // we are entering into. (for example if we move from bot selection -> game, we have to configure the enemy bot)
+    // (or other example: if we move from online lobby to )
+    void SetMainStateAs(MainStateType newMainState); // <-- simply sets the current as new, and previous as current
+    void TryEnterSinglePlayerMainState();
+    void TryEnterMultiPlayerSelectionMainState();
+    void TryEnterStartMainState();
+    void TryEnterOnlineOpponentLobbyMainState();
+    void TryEnterSameComputerOpponentMainState();
+    void TryEnterGamePlayingMainState();
+    
 
     void SwapToMenu(ChessAppMenuType menuType);
 
@@ -199,6 +245,9 @@ private:
     glm::vec2 GetViewPositionFromChessGameIndex(int index);
 
     ViewportPickResult PickChessViewPort(int x, int y);
+
+    //we dont care about y coordinate here
+    unsigned int GetChessGameIndexFromVirtualPosition(float x, float z);
 };
 
 #endif
