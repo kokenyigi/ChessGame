@@ -4,6 +4,9 @@
 
 #include <string>
 #include <vector>
+#include <cstdlib>
+#include <ctime>
+
 
 #include <glm/glm.hpp>
 #include <glad/glad.h>
@@ -15,21 +18,12 @@
 #include "Container.h"
 #include "Button.h"
 #include "Canvas.h"
+#include "Label.h"
+#include "TextInput.h"
 
 #include "OrbitCamera.h"
 
 #include "ChessGame.h"
-
-enum class ChessAppMenuType
-{
-    MENU_NONE = 0,
-    MENU_START = 1,
-    MENU_SINGLEPLAYER = 2,
-    MENU_MULTIPLAYER = 3,
-    MENU_ONLINE_LOBBY = 4,
-    MENU_SAME_COMPUTER = 5,
-    MENU_GAME = 6
-};
 
 enum class MainStateType
 {
@@ -50,11 +44,18 @@ enum class OpponentType
     OPPONENT_BOT = 3
 };
 
-enum class InteractionColorType
+enum class ChessGameLightPlayerType
 {
-    COLOR_NONE = 0,
-    COLOR_LIGHT = 1,
-    COLOR_DARK = 2
+    LIGHT_PLAYER_RANDOM = 0,
+    LIGHT_PLAYER_PLAYER1 = 1,
+    LIGHT_PLAYER_PLAYER2 = 2
+};
+
+
+enum class ChessPickingState
+{
+    PICKSTATE_NONE_PICKED = 0,
+    PICKSTATE_FIRST_POSITION_PICKED = 1,
 };
 
 struct ViewportPickResult
@@ -123,6 +124,8 @@ private:
     //The same computer menu
     Container _containerSameComputerMenu;
     Button _buttonSameComputerMenuToMultiplayerMenu;
+    Label _labelPlayer1Name; TextInput _textInputPlayer1Name; Label _labelPlayer2Name; TextInput _textInputPlayer2Name; 
+    
     Button _buttonStartSameComputerChessGame;
 
     // Finally, the Game menu, where the magic happens
@@ -133,13 +136,10 @@ private:
     Canvas _canvasChessViewport;
 
 
-    //Variables related to the menu state of the chess application
-    ChessAppMenuType _previousMenu = ChessAppMenuType::MENU_NONE;
-    ChessAppMenuType _currentMenu = ChessAppMenuType::MENU_START;
+    
 
 
-
-    // Variables related to the chess viewport
+    // Variables related to the chess viewport rendering
     glm::vec2 _chessViewportSize = glm::vec2(100,100);
 
     Texture _chessViewPortTexture;
@@ -167,11 +167,27 @@ private:
     Shader _pieceShader;
     std::vector<Mesh<VertexP3N3>> _pieceMeshes;
 
+    
+
+    // Variables related to the chess model logic and interaction logic
     ChessGame _chessGame;
 
+    //pregame configurations
+    ChessGameLightPlayerType _whoShouldBeLightPlayerDuringGame = ChessGameLightPlayerType::LIGHT_PLAYER_RANDOM;
+    ChessGameLightPlayerType _lightPlayerIdentifier = ChessGameLightPlayerType::LIGHT_PLAYER_RANDOM; // actually who is light during game
+    OpponentType _gameOpponentIsFrom = OpponentType::OPPONENT_NONE; // where the opponent moves are awaited from
+
     //picking related variables
-    bool isAPositionPicked = false;
-    glm::vec3 pickedPosition = glm::vec3(0,0,0);
+    ChessPickingState _currentPickingState = ChessPickingState::PICKSTATE_NONE_PICKED;
+    unsigned int _firstPickedIndex = 64u; // 64 is impossible to reach
+    uint64_t _cachedCurrentPickingState = 0u;
+
+    //previous move is also stored for easier readability
+    unsigned int _previousMoveFirstIndex = 64u;
+    unsigned int _previousMoveSecondIndex = 64u;
+    uint64_t _cachedPreviousMoveBitmask = 0u;
+
+    uint64_t _cachedLegalMovesBitmask = 0ull;
     
 public:
     ChessApp();
@@ -230,24 +246,45 @@ private:
     void TryEnterOnlineOpponentLobbyMainState();
     void TryEnterSameComputerOpponentMainState();
     void TryEnterGamePlayingMainState();
-    
 
-    void SwapToMenu(ChessAppMenuType menuType);
+    /**
+     * This function set the state of the chessgame "model" class, and also sets the camera in a start angle
+     */
+    void SetupSharedChessGameState();
+
+    /**
+     * Based on the state it was called from, it sets up a state where the client is only playing itself.
+     * In this state, it sets the opponent to be from the same computer, and by using the variable of whostartfirst, it can make
+     * a determined state.
+     */
+    void SetupSameComputerGame();
+    ChessGameLightPlayerType GetRandomPlayer();
+
+    void SetupOnlineGame();
+
+    void SetupSingleplayerGame();
+    
 
     void ChessViewPortResize(int newWidth, int newHeight);
     void ChessViewPortRender();
+    glm::vec2 GetViewPositionFromChessGameIndex(int index);
     void ChessViewPortUpdate(float deltaTime);
     void ChessViewPortMouseMove(float newX, float newY);
     void ChessViewPortMouseClick(MouseButtonType button, MouseActionType action);
     void ChessViewPortMouseWheel(float amount, MouseWheelDirection direction);
 
-
-    glm::vec2 GetViewPositionFromChessGameIndex(int index);
-
+    //Picking related functions
     ViewportPickResult PickChessViewPort(int x, int y);
+    void ResetPickingState();
+    void TryAdvancePickingState(unsigned int pickedIndex);
+    void CalculateCachedPickingState();
+    void CalculateCachedPreviousMoveBitmask();
+    unsigned int GetChessGameIndexFromVirtualPosition(float x, float z); // we dont care about y coord
 
-    //we dont care about y coordinate here
-    unsigned int GetChessGameIndexFromVirtualPosition(float x, float z);
+    //The main move functions inside view
+    // returns whether or not move was succesful
+    bool TryMakeMove(unsigned int firstIndex, unsigned int secondIndex);
+    
 };
 
 #endif

@@ -5,12 +5,14 @@
 #include <glm/glm.hpp>
 #include <string>
 
+#include <iostream>
+#include <cstdint>
+
 struct Plane
 {
 	float offset;
 	glm::vec3 normal;
 };
-
 
 /**
 * 
@@ -124,6 +126,8 @@ AABB3 GetWorldBoundsOfTransformedAABB(const glm::mat4& worldTransform, const AAB
 
 void FeedAABB3ToAABB3(AABB3& eater, const AABB3& food);
 void FeedVec3ToAABB3(AABB3& eater, const glm::vec3& food);
+
+
 
 
 

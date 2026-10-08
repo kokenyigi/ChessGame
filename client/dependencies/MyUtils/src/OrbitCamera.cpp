@@ -11,6 +11,12 @@ void OrbitCamera::Init(const glm::vec3 &fixatePoint, const glm::vec3 &startPosit
     CalculateYawAndPitchAndDistance();
 }
 
+void OrbitCamera::SetPosition(const glm::vec3 &newPos)
+{
+    this->_cameraPosition = newPos;
+    CalculateYawAndPitchAndDistance();
+}
+
 void OrbitCamera::Resize(const glm::vec2 &newDimensions)
 {
     if(newDimensions .x > 0 && newDimensions.y > 0)

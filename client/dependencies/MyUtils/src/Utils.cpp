@@ -590,6 +590,8 @@ void FeedVec3ToAABB3(AABB3& eater, const glm::vec3& food)
 	eater.max.z = fmax(eater.max.z,food.z);
 }
 
+
+
 void FeedAABB3ToAABB3(AABB3 &eater, const AABB3 &food)
 {
 	eater.min.x = fmin(eater.min.x,food.min.x);

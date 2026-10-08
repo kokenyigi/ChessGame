@@ -39,6 +39,8 @@ ChessApp::ChessApp()
 	this->_orbitCamera.Init(glm::vec3(0,0,0),glm::vec3(4,4,4),glm::vec3(0,1,0),_chessViewportSize);
 
 	this->_currentMainState = MainStateType::MAINSTATE_START;
+
+	srand(time(nullptr));
 }
 
 ChessApp::~ChessApp()
@@ -518,53 +520,47 @@ void ChessApp::TryEnterGamePlayingMainState()
 		std::cout << "[App]: cant enter Game playing state from this state\n";
 		return;
 	}
-
 	SetMainStateAs(MainStateType::MAINSTATE_GAME_PLAYING);
 	this->_containerGameMenu.SetIsActive(true);
+
+	if(_previousMainState == MainStateType::MAINSTATE_SAME_COMPUTER_GAME_CONFIGURATION)
+	{
+		//std::cout<<"Setting up same computer menu state, bc we entered from that\n";
+		SetupSameComputerGame();
+	}
 }
 
-void ChessApp::SwapToMenu(ChessAppMenuType menuType)
+void ChessApp::SetupSharedChessGameState()
 {
-	if(this->_currentMenu == menuType) return;
-	
-	/*
-	this->_containerStartMenu.SetIsActive(false);
-	this->_containerSinglePlayerMenu.SetIsActive(false);
-	this->_containerMultiplayerMenu.SetIsActive(false);
-	this->_containerOnlineLobbyMenu.SetIsActive(false);
-	this->_containerSameComputerMenu.SetIsActive(false);
-	this->_containerGameMenu.SetIsActive(false);
-	*/
+	this->_chessGame.StartNewGame();
+	this->_orbitCamera.SetPosition(glm::vec3(8,4,8));
+	ResetPickingState();
 
-	this->_previousMenu = this->_currentMenu;
-	this->_currentMenu = menuType;
+	this->_previousMoveFirstIndex = 64u;
+	this->_previousMoveSecondIndex = 64u;
+	CalculateCachedPreviousMoveBitmask();
+}
 
-	switch(menuType)
+void ChessApp::SetupSameComputerGame()
+{
+	//setup chess game state and camera
+	SetupSharedChessGameState();
+
+	this->_gameOpponentIsFrom = OpponentType::OPPONENT_SAME_COMPUTER_PLAYER;
+	if(this->_whoShouldBeLightPlayerDuringGame == ChessGameLightPlayerType::LIGHT_PLAYER_RANDOM)
 	{
-		case ChessAppMenuType::MENU_START:
-			this->_containerStartMenu.SetIsActive(true);
-		break;
-
-		case ChessAppMenuType::MENU_SINGLEPLAYER:
-			this->_containerSinglePlayerMenu.SetIsActive(true);
-		break;
-
-		case ChessAppMenuType::MENU_MULTIPLAYER:
-			this->_containerMultiplayerMenu.SetIsActive(true);
-		break;
-
-		case ChessAppMenuType::MENU_ONLINE_LOBBY:
-			this->_containerOnlineLobbyMenu.SetIsActive(true);
-		break;
-
-		case ChessAppMenuType::MENU_SAME_COMPUTER:
-			this->_containerSameComputerMenu.SetIsActive(true);
-		break;
-
-		case ChessAppMenuType::MENU_GAME:
-			this->_containerGameMenu.SetIsActive(true);
-		break;
+		this->_lightPlayerIdentifier = GetRandomPlayer(); //  if it s a single player game the client can just decide who is who
 	}
+	else
+	{
+		this->_lightPlayerIdentifier = _whoShouldBeLightPlayerDuringGame;
+	}
+}
+
+ChessGameLightPlayerType ChessApp::GetRandomPlayer()
+{
+	int integer = rand() % 2 + 1;
+    return (ChessGameLightPlayerType)integer;
 }
 
 void ChessApp::ChessViewPortResize(int newWidth, int newHeight)
@@ -613,18 +609,13 @@ void ChessApp::ChessViewPortRender()
 	this->_boardShader.SetUniform<glm::vec3>("uDarkColor",this->_boardDarkColor);
 	this->_boardShader.SetUniform<glm::vec3>("uLightColor",this->_boardLightColor);
 
-	glm::uvec2 glowingTileBitmask = glm::uvec2(0u);
-	if(this->isAPositionPicked == true)
-	{
-		unsigned int indexOfCurrentlySelectedTile = GetChessGameIndexFromVirtualPosition(this->pickedPosition.x,pickedPosition.z);
-		if(indexOfCurrentlySelectedTile >= 0 && indexOfCurrentlySelectedTile < 64)
-		{
-			uint64_t bitmaskOfGlowingTiles = ChessGame::CreateBitmaskFromIndex(indexOfCurrentlySelectedTile);
-			glowingTileBitmask = ChessApp::CreateUvec2FromUint64t(bitmaskOfGlowingTiles);
-		}
-	}
+	glm::uvec2 pickingTileBitmask = ChessApp::CreateUvec2FromUint64t(this->_cachedCurrentPickingState);
+	glm::uvec2 previousMoveBitmask = ChessApp::CreateUvec2FromUint64t(this->_cachedPreviousMoveBitmask);
+	glm::uvec2 legalMovesBitmask = ChessApp::CreateUvec2FromUint64t(this->_cachedLegalMovesBitmask);
 
-	this->_boardShader.SetUniform<glm::uvec2>("uGlowingTileIndicesBitmask",glowingTileBitmask);
+	this->_boardShader.SetUniform<glm::uvec2>("uPickingBitmask",pickingTileBitmask);
+	this->_boardShader.SetUniform<glm::uvec2>("uPreviousMoveBitmask",previousMoveBitmask);
+	this->_boardShader.SetUniform<glm::uvec2>("uLegalMovesBitmask",legalMovesBitmask);
 	
 
 	this->_boardMesh.Draw();
@@ -709,12 +700,18 @@ void ChessApp::ChessViewPortMouseClick(MouseButtonType button, MouseActionType a
 				ViewportPickResult pickResult = PickChessViewPort(_chessViewportCurrentMousePos.x,_chessViewportCurrentMousePos.y);
 				if(pickResult.wasAnythingActuallyThere == true)
 				{
-					this->isAPositionPicked = true;
-					this->pickedPosition = pickResult.pickedVirtualCoordinates;
+					unsigned int indexOfCurrentlySelectedTile = GetChessGameIndexFromVirtualPosition(
+						pickResult.pickedVirtualCoordinates.x,
+						pickResult.pickedVirtualCoordinates.z);
+
+					if(indexOfCurrentlySelectedTile >= 0u && indexOfCurrentlySelectedTile < 64u)
+					{
+						TryAdvancePickingState(indexOfCurrentlySelectedTile);
+					}
 				}
 				else
 				{
-					this->isAPositionPicked = false;
+					ResetPickingState();
 				}
 
 				this->_isDraggingChessViewport = true;
@@ -778,6 +775,111 @@ ViewportPickResult ChessApp::PickChessViewPort(int x, int y)
 	return retval;
 }
 
+void ChessApp::ResetPickingState()
+{
+	this->_currentPickingState = ChessPickingState::PICKSTATE_NONE_PICKED;
+	this->_firstPickedIndex = 64u;
+	//this->_secondPickedIndex = 64u;
+	CalculateCachedPickingState();
+
+	this->_cachedLegalMovesBitmask = 0ull;
+}
+
+void ChessApp::TryAdvancePickingState(unsigned int pickedIndex)
+{
+	if(pickedIndex >= 64u) return;
+
+	ChessTileViewData whatIsOnThisPickedTile = this->_chessGame.GetTileViewData(pickedIndex);
+	ChessColorType whoseTurnIsIt = this->_chessGame.GetWhoseTurnItIs();
+	//std::cout<<"Trying to advance picking!\n";
+
+	if(this->_currentPickingState == ChessPickingState::PICKSTATE_NONE_PICKED)
+	{
+		//Nothing has yet been picked in this picking state, therefore the only way first picking can be succesful is if
+		// this client program picks the piece on the board that it can control, and its that piece's turn.
+		//std::cout<<"First position picking check start\n";
+		//std::cout<<"Index: " << pickedIndex << "\n";
+		//std::cout<<"Some data:\n" <<(unsigned int)whatIsOnThisPickedTile.color << " " << (unsigned int)whatIsOnThisPickedTile.piece << " " <<(unsigned int)whoseTurnIsIt << "\n";
+		// here we have a pretty hefty if conditional branch of when picking is safe and allowed based on different gamemodes
+		if(whatIsOnThisPickedTile.piece != PIECE_NONE && (
+			(this->_gameOpponentIsFrom == OpponentType::OPPONENT_SAME_COMPUTER_PLAYER && whoseTurnIsIt == whatIsOnThisPickedTile.color)
+		))
+		{
+			//std::cout<<"First position is valid\n";
+			//the tile can be picked.
+			this->_firstPickedIndex = pickedIndex;
+			this->_cachedLegalMovesBitmask = this->_chessGame.GetLegalMovesBitmaskOfPieceAt(pickedIndex);
+			//std::cout<<_cachedLegalMovesBitmask << "\n";
+			this->_currentPickingState = ChessPickingState::PICKSTATE_FIRST_POSITION_PICKED;
+		}
+	}
+	else if(this->_currentPickingState == ChessPickingState::PICKSTATE_FIRST_POSITION_PICKED)
+	{
+		//this if determines when the move function and reset picking is donw
+		// second condition is basically saying: if we touched an enemy piece
+		if(whatIsOnThisPickedTile.piece == PIECE_NONE || (whatIsOnThisPickedTile.color != whoseTurnIsIt))
+		{
+			// Here we can make the BIG move function(implemented later on)
+			// which basically calls the models try make move or trymove function, and we only reset picking state if that fails
+			// otherwise a move will be made, and picking state will be reset.
+
+			//Chess move function
+
+			bool wasMoveSuccesful = TryMakeMove(this->_firstPickedIndex,pickedIndex);
+			if(wasMoveSuccesful) // this reset happens only if the move was valid
+			{
+				
+
+				// and we also should save coordinates of latest(this) move
+				
+				this->_previousMoveFirstIndex = this->_firstPickedIndex;
+				this->_previousMoveSecondIndex = pickedIndex;
+				
+				//std::cout<<"move poses: prev: " << _previousMoveFirstIndex << " next: " << _previousMoveSecondIndex << "\n";
+				CalculateCachedPreviousMoveBitmask(); // calculates a bitmask from the before set two indices
+
+				ResetPickingState();
+
+			}
+
+			//else nothing else happens: we are listening for another picking spot from the same player
+		}
+		else
+		{
+			//this part is ONLY ran whenever as the second position we want to pick one of our other own piece, 
+			_firstPickedIndex = pickedIndex;
+			this->_cachedLegalMovesBitmask = this->_chessGame.GetLegalMovesBitmaskOfPieceAt(pickedIndex);
+			//std::cout<<_cachedLegalMovesBitmask << "\n";
+		}
+	}
+
+	CalculateCachedPickingState();
+}
+
+void ChessApp::CalculateCachedPickingState()
+{
+	this->_cachedCurrentPickingState = 0u;
+	if(this->_firstPickedIndex < 64u)
+	{
+		this->_cachedCurrentPickingState |= ChessGame::CreateBitmaskFromIndex(this->_firstPickedIndex);
+	}
+
+}
+
+void ChessApp::CalculateCachedPreviousMoveBitmask()
+{
+	this->_cachedPreviousMoveBitmask = 0u;
+	if(this->_previousMoveFirstIndex < 64u)
+	{
+		this->_cachedPreviousMoveBitmask |= ChessGame::CreateBitmaskFromIndex(this->_previousMoveFirstIndex);
+	}
+
+	if(this->_previousMoveSecondIndex < 64u)
+	{
+		this->_cachedPreviousMoveBitmask |= ChessGame::CreateBitmaskFromIndex(this->_previousMoveSecondIndex);
+	}
+}
+
 unsigned int ChessApp::GetChessGameIndexFromVirtualPosition(float x, float z)
 {
 	float halfWidth = this->_boardWidth * 0.5f;
@@ -790,9 +892,24 @@ unsigned int ChessApp::GetChessGameIndexFromVirtualPosition(float x, float z)
 
 	glm::uvec2 posIndices = glm::uvec2(pos);
 	glm::uvec2 clampedPosIndices = glm::clamp(posIndices,glm::uvec2(0,0),glm::uvec2(7,7));
-	unsigned int index = clampedPosIndices.x + clampedPosIndices.y * 8;
+	unsigned int index = clampedPosIndices.x * 8 + clampedPosIndices.y ;
+
+	
 
     return index;
+}
+
+bool ChessApp::TryMakeMove(unsigned int firstIndex, unsigned int secondIndex)
+{
+	ChessMoveResultData moveResult = this->_chessGame.TryMove(firstIndex,secondIndex);
+
+	if(moveResult.mainResult == ChessMoveMainResultType::RESULT_FAILURE)
+	{
+		//we return with a quick false
+		return false;
+	}
+	
+	return true;
 }
 
 void ChessApp::WindowSizeCallback(GLFWwindow* window, int width, int height)

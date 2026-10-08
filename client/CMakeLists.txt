@@ -30,14 +30,15 @@ target_include_directories(glad PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/GLAD/include
 )
 
+
 # add the headers incldue paths of my own source code to the project.
 target_include_directories(chessClient PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/My2DRenderer/include
     ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/MyGlAbstraction/include
     ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/MyGui/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/MyUtils/include
     ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/GLM
+    ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/MyUtils/include
 )
 
 # we need opengl from somewhere -> find it -> link it
