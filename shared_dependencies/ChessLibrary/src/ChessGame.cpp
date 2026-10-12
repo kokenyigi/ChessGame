@@ -36,24 +36,33 @@ ChessMoveResultData ChessGame::TryMove(unsigned int fromIndex, unsigned int toIn
 
         return retvalResult;
     }
-
-    retvalResult.mainResult = ChessMoveMainResultType::RESULT_SUCCESS;
-
-
-    SwapToOtherPlayer();
+    retvalResult.type = ChessMoveResultType::RESULT_SUCCESS;
 
     SetupViewBoardBasedOnState(); // for view
-    
+
+    unsigned int toRank = toIndex / 8u;
+    if(fromTileData.piece == PIECE_PAWN && (toRank >= 7u || toRank <= 0u) ) // if the move resulted in a pawn promotion
+    {
+        retvalResult.gameState = ChessGameStateType::STATE_PROMOTION_REQUIRED;
+        return retvalResult;
+    }
+
+    retvalResult.gameState = FinalizeStateAfterMove();
+    if(retvalResult.gameState == ChessGameStateType::STATE_PLAYING && retvalResult.gameState == ChessGameStateType::STATE_DRAW_REQUESTABLE)
+    {
+        SwapToOtherPlayer();
+    }
+
     return retvalResult;
 }
 
-uint64_t ChessGame::GetLegalMovesBitmaskOfPieceAt(uint8_t index)
+ChessLegalMovesData ChessGame::GetLegalMovesBitmaskOfPieceAt(uint8_t index)
 {
-    uint64_t retvalBitmask = 0ull;
-    if(index >= 64u) return retvalBitmask;
+    ChessLegalMovesData retvalLegalMoves;
+    if(index >= 64u) return retvalLegalMoves;
 
     ChessTileData tileAtIndex = GetTileDataAt(index);
-    if(tileAtIndex.piece == PIECE_NONE || tileAtIndex.color != (ChessColorType)_state.currentPlayer) return retvalBitmask;
+    if(tileAtIndex.piece == PIECE_NONE || tileAtIndex.color != (ChessColorType)_state.currentPlayer) return retvalLegalMoves;
 
     uint64_t pseudoLegalPositionsBitmaskOfPiece = GetPseudoLegalMovesOfPiece(index,tileAtIndex.piece,tileAtIndex.color);
     while(pseudoLegalPositionsBitmaskOfPiece)
@@ -61,13 +70,22 @@ uint64_t ChessGame::GetLegalMovesBitmaskOfPieceAt(uint8_t index)
         uint8_t currentPseudoLegalPositionIndex = GetLeastSignificantBitIndexFromBitmask(pseudoLegalPositionsBitmaskOfPiece);
 
         ChessGameState stateBeforeMove = this->_state;
+        uint64_t enemyPiecesBeforeMove = GetPiecePositionsBitmaskOf(GetInverseColor(tileAtIndex.color));
 
         ApplyMove(index,currentPseudoLegalPositionIndex);
         
         uint64_t currentEnemyAttackMask = GetAttackBitmaskOf(GetInverseColor(tileAtIndex.color));
         if( (currentEnemyAttackMask & _state.piecePositions[tileAtIndex.color][PIECE_KING]) == 0ull )
         {
-            retvalBitmask |= CreateBitmaskFromIndex(currentPseudoLegalPositionIndex);
+            uint64_t enemyPiecesAfterMove = GetPiecePositionsBitmaskOf(GetInverseColor(tileAtIndex.color));
+            if(enemyPiecesBeforeMove != enemyPiecesAfterMove) // a piece has been "captured"
+            {
+                retvalLegalMoves.captureBitmask |= CreateBitmaskFromIndex(currentPseudoLegalPositionIndex);
+            }
+            else
+            {
+                retvalLegalMoves.moveBitmask |= CreateBitmaskFromIndex(currentPseudoLegalPositionIndex);
+            }
         }
 
         _state = stateBeforeMove;
@@ -75,7 +93,7 @@ uint64_t ChessGame::GetLegalMovesBitmaskOfPieceAt(uint8_t index)
         pseudoLegalPositionsBitmaskOfPiece = RemoveLeastSignificantBitOfBitmask(pseudoLegalPositionsBitmaskOfPiece);
     }
 
-    return retvalBitmask;
+    return retvalLegalMoves;
 
 }
 
@@ -1021,6 +1039,67 @@ void ChessGame::ApplyMove(uint8_t from, uint8_t to)
 
     //we should return something [TODO]
     // for example like if a pawn promoted...but this might not be the best place, since we check 
+}
+
+ChessGameStateType ChessGame::FinalizeStateAfterMove()
+{
+    ChessColorType currentColor = (ChessColorType)_state.currentPlayer;
+    ChessColorType enemyColor = GetInverseColor(currentColor);
+
+    uint64_t currentColorAttackBitmask = GetAttackBitmaskOf(currentColor);
+    bool isEnemyKingUnderAttack = (this->_state.piecePositions[enemyColor][PIECE_KING] & currentColorAttackBitmask) != 0ull;
+    bool doesEnemyHaveAnyLegalMovesAfterAttack = HasAnyLegalMoves(enemyColor);
+    if(doesEnemyHaveAnyLegalMovesAfterAttack)
+    {
+        if(isEnemyKingUnderAttack)
+        {
+            return ChessGameStateType::STATE_GAME_WON;
+        }
+        else
+        {
+            return ChessGameStateType::STATE_DRAW_STALEMATE;
+        }
+    }
+
+    // [TODO]: check rest of the draw cases and state changes.
+
+    return ChessGameStateType::STATE_PLAYING;
+}
+
+bool ChessGame::HasAnyLegalMoves(ChessColorType color)
+{
+    uint64_t piecesOfColor = GetPiecePositionsBitmaskOf(color);
+    bool hasFoundLegalMove = false;
+    while(piecesOfColor && !hasFoundLegalMove)
+    {
+        uint8_t pieceIndex = GetLeastSignificantBitIndexFromBitmask(piecesOfColor);
+        ChessTileData tileData = GetTileDataAt(pieceIndex);
+
+        uint64_t pseudoLegalMoves =  GetPseudoLegalMovesOfPiece(pieceIndex,tileData.piece,color);
+
+        while(pseudoLegalMoves && !hasFoundLegalMove)
+        {
+            uint8_t toIndex = GetLeastSignificantBitIndexFromBitmask(pseudoLegalMoves);
+
+            ChessGameState stateBeforeMove = _state;
+
+            ApplyMove(pieceIndex,toIndex);
+
+            uint64_t attackBitmaskOfEnemy = GetAttackBitmaskOf(GetInverseColor(color));
+            if( (_state.piecePositions[color][PIECE_KING] & attackBitmaskOfEnemy) == 0ull)// a pseudolegal move is legal if the king is in safety
+            {
+                hasFoundLegalMove = true;
+            }
+
+            _state = stateBeforeMove;
+
+            pseudoLegalMoves = RemoveLeastSignificantBitOfBitmask(pseudoLegalMoves);
+        }
+
+        piecesOfColor = RemoveLeastSignificantBitOfBitmask(piecesOfColor);
+    }
+
+    return hasFoundLegalMove;
 }
 
 uint64_t ChessGame::CreateBitmaskFromIndex(uint8_t index)

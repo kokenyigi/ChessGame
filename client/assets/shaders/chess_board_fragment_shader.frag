@@ -8,11 +8,20 @@ uniform float uBoardHeight;
 
 uniform vec3 uDarkColor;
 uniform vec3 uLightColor;
+const vec3 pickingColor = vec3(0,0.7,0);
+const vec3 previousMoveColor = vec3(0.8,0.4,0.0);
+const vec3 legalMoveColor = vec3(0,1,0);
 
 // this uniform is 2 * 32 bits of flags for each board position
 uniform uvec2 uPickingBitmask;
-uniform uvec2 uPreviousMoveBitmask;
+uniform uvec2 uPreviousMoveStart;
+uniform uvec2 uPreviousMoveEnd;
 uniform uvec2 uLegalMovesBitmask;
+uniform uvec2 uLegalCapturesBitmask;
+
+const float legalMoveCircleDiameterRatioToTileWidth = 0.4f;
+const float legalCaptureRingInnerDiameterRatioToTileWidth = 0.8f;
+const float legalCaptureRingOuterDiameterRatioToTileWidth = 0.9f;
 
 out vec4 fragColor;
 
@@ -43,29 +52,49 @@ void main()
 
     indexValue = clamp(indexValue,ivec2(0,0),ivec2(7,7));
 
+    vec2 middleOfTile = (vec2(indexValue) + vec2(0.5,0.5)) * vec2(eighthWidth) - vec2(halfWidth);
+    vec2 toTileMidFromFrag = middleOfTile - vPosition.xz;
+
     uint indexOfTile = uint(indexValue.x * 8 + indexValue.y);
     uvec2 bitmaskOfTile = CreateBitmaskFromIndex(indexOfTile);
     if(any((bitmaskOfTile & uLegalMovesBitmask) != uvec2(0u)))
     {
-        
-
-        vec2 middleOfTile = (vec2(indexValue) + vec2(0.5,0.5)) * vec2(eighthWidth) - vec2(halfWidth);
-
-
-
-        vec2 toTileMidFromFrag = middleOfTile - vPosition.xz;
-
-        float radius = eighthWidth * 0.2f;
-
+        float radius = eighthWidth * legalMoveCircleDiameterRatioToTileWidth * 0.5f;
         if(toTileMidFromFrag.x*toTileMidFromFrag.x + toTileMidFromFrag.y*toTileMidFromFrag.y < radius * radius)
         {
-            fragColor = vec4(0,1,0,1);
+            fragColor = vec4(legalMoveColor,1);
             return;
         }
     }
-    if(any((bitmaskOfTile & uPreviousMoveBitmask) != uvec2(0u)))
+    else if(any((bitmaskOfTile & uLegalCapturesBitmask) != uvec2(0u)))
     {
-        fragColor = vec4(1,1,0,1);
+        float innerRadius = eighthWidth * legalCaptureRingInnerDiameterRatioToTileWidth * 0.5f;
+        float innerRadiusSquared = innerRadius * innerRadius;
+        
+        float outerRadius = eighthWidth * legalCaptureRingOuterDiameterRatioToTileWidth * 0.5f;
+        float outerRadiusSquared = outerRadius * outerRadius;
+
+        float compareValue = toTileMidFromFrag.x*toTileMidFromFrag.x + toTileMidFromFrag.y*toTileMidFromFrag.y;
+        if(compareValue > innerRadiusSquared && compareValue < outerRadiusSquared)
+        {
+            fragColor = vec4(legalMoveColor,1);
+            return;
+        }
+    }
+    else if(any((bitmaskOfTile & uPickingBitmask) != uvec2(0u)))
+    {
+        fragColor = vec4(pickingColor,1);
+        return;
+    }
+
+    if(any((bitmaskOfTile & uPreviousMoveStart) != uvec2(0u)))
+    {
+        fragColor = vec4(previousMoveColor*vec3(0.8f),1);
+        return;
+    }
+    else if(any((bitmaskOfTile & uPreviousMoveEnd) != uvec2(0u)))
+    {
+        fragColor = vec4(previousMoveColor,1);
         return;
     }
     

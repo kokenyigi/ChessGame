@@ -180,14 +180,16 @@ private:
     //picking related variables
     ChessPickingState _currentPickingState = ChessPickingState::PICKSTATE_NONE_PICKED;
     unsigned int _firstPickedIndex = 64u; // 64 is impossible to reach
-    uint64_t _cachedCurrentPickingState = 0u;
+    uint64_t _cachedCurrentPickedBitmask = 0ull;
 
     //previous move is also stored for easier readability
     unsigned int _previousMoveFirstIndex = 64u;
     unsigned int _previousMoveSecondIndex = 64u;
-    uint64_t _cachedPreviousMoveBitmask = 0u;
+    uint64_t _cachedPreviousMoveStartBitmask = 0ull;
+    uint64_t _cachedPreviousMoveEndBitmask = 0ull;
 
     uint64_t _cachedLegalMovesBitmask = 0ull;
+    uint64_t _cachedLegalCapturesBitmask = 0ull;
     
 public:
     ChessApp();

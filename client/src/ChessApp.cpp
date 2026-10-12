@@ -609,13 +609,17 @@ void ChessApp::ChessViewPortRender()
 	this->_boardShader.SetUniform<glm::vec3>("uDarkColor",this->_boardDarkColor);
 	this->_boardShader.SetUniform<glm::vec3>("uLightColor",this->_boardLightColor);
 
-	glm::uvec2 pickingTileBitmask = ChessApp::CreateUvec2FromUint64t(this->_cachedCurrentPickingState);
-	glm::uvec2 previousMoveBitmask = ChessApp::CreateUvec2FromUint64t(this->_cachedPreviousMoveBitmask);
+	glm::uvec2 pickingTileBitmask = ChessApp::CreateUvec2FromUint64t(this->_cachedCurrentPickedBitmask);
+	glm::uvec2 previousMoveStartBitmask = ChessApp::CreateUvec2FromUint64t(this->_cachedPreviousMoveStartBitmask);
+	glm::uvec2 previousMoveEndBitmask = ChessApp::CreateUvec2FromUint64t(this->_cachedPreviousMoveEndBitmask);
 	glm::uvec2 legalMovesBitmask = ChessApp::CreateUvec2FromUint64t(this->_cachedLegalMovesBitmask);
+	glm::uvec2 legalCapturesBitmask = ChessApp::CreateUvec2FromUint64t(this->_cachedLegalCapturesBitmask);
 
 	this->_boardShader.SetUniform<glm::uvec2>("uPickingBitmask",pickingTileBitmask);
-	this->_boardShader.SetUniform<glm::uvec2>("uPreviousMoveBitmask",previousMoveBitmask);
+	this->_boardShader.SetUniform<glm::uvec2>("uPreviousMoveStart",previousMoveStartBitmask);
+	this->_boardShader.SetUniform<glm::uvec2>("uPreviousMoveEnd",previousMoveEndBitmask);
 	this->_boardShader.SetUniform<glm::uvec2>("uLegalMovesBitmask",legalMovesBitmask);
+	this->_boardShader.SetUniform<glm::uvec2>("uLegalCapturesBitmask",legalCapturesBitmask);
 	
 
 	this->_boardMesh.Draw();
@@ -783,6 +787,7 @@ void ChessApp::ResetPickingState()
 	CalculateCachedPickingState();
 
 	this->_cachedLegalMovesBitmask = 0ull;
+	this->_cachedLegalCapturesBitmask = 0ull;
 }
 
 void ChessApp::TryAdvancePickingState(unsigned int pickedIndex)
@@ -808,7 +813,9 @@ void ChessApp::TryAdvancePickingState(unsigned int pickedIndex)
 			//std::cout<<"First position is valid\n";
 			//the tile can be picked.
 			this->_firstPickedIndex = pickedIndex;
-			this->_cachedLegalMovesBitmask = this->_chessGame.GetLegalMovesBitmaskOfPieceAt(pickedIndex);
+			ChessLegalMovesData legalMovesData = this->_chessGame.GetLegalMovesBitmaskOfPieceAt(pickedIndex);
+			this->_cachedLegalMovesBitmask = legalMovesData.moveBitmask;
+			this->_cachedLegalCapturesBitmask = legalMovesData.captureBitmask;
 			//std::cout<<_cachedLegalMovesBitmask << "\n";
 			this->_currentPickingState = ChessPickingState::PICKSTATE_FIRST_POSITION_PICKED;
 		}
@@ -848,7 +855,9 @@ void ChessApp::TryAdvancePickingState(unsigned int pickedIndex)
 		{
 			//this part is ONLY ran whenever as the second position we want to pick one of our other own piece, 
 			_firstPickedIndex = pickedIndex;
-			this->_cachedLegalMovesBitmask = this->_chessGame.GetLegalMovesBitmaskOfPieceAt(pickedIndex);
+			ChessLegalMovesData legalMovesData = this->_chessGame.GetLegalMovesBitmaskOfPieceAt(pickedIndex);
+			this->_cachedLegalMovesBitmask = legalMovesData.moveBitmask;
+			this->_cachedLegalCapturesBitmask = legalMovesData.captureBitmask;
 			//std::cout<<_cachedLegalMovesBitmask << "\n";
 		}
 	}
@@ -858,25 +867,26 @@ void ChessApp::TryAdvancePickingState(unsigned int pickedIndex)
 
 void ChessApp::CalculateCachedPickingState()
 {
-	this->_cachedCurrentPickingState = 0u;
+	this->_cachedCurrentPickedBitmask = 0u;
 	if(this->_firstPickedIndex < 64u)
 	{
-		this->_cachedCurrentPickingState |= ChessGame::CreateBitmaskFromIndex(this->_firstPickedIndex);
+		this->_cachedCurrentPickedBitmask |= ChessGame::CreateBitmaskFromIndex(this->_firstPickedIndex);
 	}
 
 }
 
 void ChessApp::CalculateCachedPreviousMoveBitmask()
 {
-	this->_cachedPreviousMoveBitmask = 0u;
+	this->_cachedPreviousMoveStartBitmask = 0u;
 	if(this->_previousMoveFirstIndex < 64u)
 	{
-		this->_cachedPreviousMoveBitmask |= ChessGame::CreateBitmaskFromIndex(this->_previousMoveFirstIndex);
+		this->_cachedPreviousMoveStartBitmask |= ChessGame::CreateBitmaskFromIndex(this->_previousMoveFirstIndex);
 	}
 
+	this->_cachedPreviousMoveEndBitmask = 0ull;
 	if(this->_previousMoveSecondIndex < 64u)
 	{
-		this->_cachedPreviousMoveBitmask |= ChessGame::CreateBitmaskFromIndex(this->_previousMoveSecondIndex);
+		this->_cachedPreviousMoveEndBitmask |= ChessGame::CreateBitmaskFromIndex(this->_previousMoveSecondIndex);
 	}
 }
 
@@ -903,7 +913,7 @@ bool ChessApp::TryMakeMove(unsigned int firstIndex, unsigned int secondIndex)
 {
 	ChessMoveResultData moveResult = this->_chessGame.TryMove(firstIndex,secondIndex);
 
-	if(moveResult.mainResult == ChessMoveMainResultType::RESULT_FAILURE)
+	if(moveResult.type == ChessMoveResultType::RESULT_FAILURE)
 	{
 		//we return with a quick false
 		return false;

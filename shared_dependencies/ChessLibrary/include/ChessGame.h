@@ -59,28 +59,33 @@ struct ChessTileViewData
     ChessColorType color = COLOR_NONE;
 };
 
-enum class ChessMoveMainResultType: uint8_t
+enum class ChessMoveResultType: uint8_t
 {
     RESULT_FAILURE = 0u,
     RESULT_SUCCESS = 1u
 };
 
-enum class ChessMoveSubResultType: uint8_t
+enum class ChessGameStateType: uint8_t
 {
-    RESULT_NONE = 0u,
-    RESULT_LIGHT_PROMOTED = 1u,
-    RESULT_DARK_PROMOTED = 2u,
-    RESULT_DRAW_REQUESTABLE = 3u,
-    RESULT_DRAW_REPETITION = 4u,
-    RESULT_DRAW_STALEMATE = 5u,
-    RESULT_LIGHT_WON = 6u,
-    RESULT_DARK_WON = 7u,
+    STATE_PLAYING = 0u,
+    STATE_PROMOTION_REQUIRED = 1u,
+    STATE_DRAW_REQUESTABLE = 2u,
+    STATE_DRAW_REPETITION = 3u,
+    STATE_DRAW_STALEMATE = 4u,
+    STATE_DRAW_INSUFFICIENT_MATERIAL = 5u,
+    STATE_GAME_WON = 6u,
 };
 
 struct ChessMoveResultData
 {
-    ChessMoveMainResultType mainResult = ChessMoveMainResultType::RESULT_FAILURE;
-    ChessMoveSubResultType subResult = ChessMoveSubResultType::RESULT_NONE;
+    ChessMoveResultType type = ChessMoveResultType::RESULT_FAILURE;
+    ChessGameStateType gameState = ChessGameStateType::STATE_PLAYING;
+};
+
+struct ChessLegalMovesData
+{
+    uint64_t moveBitmask = 0ull;
+    uint64_t captureBitmask = 0ull;
 };
 
 struct ChessTileData
@@ -133,7 +138,7 @@ public:
      * index ->specifies the where the piece is located
      * Using complex chess-rules and state it calculates the valid bitmask, holding a 1 where the piece can move, and 0 everywhere else.
      */
-    uint64_t GetLegalMovesBitmaskOfPieceAt(uint8_t index);
+    ChessLegalMovesData GetLegalMovesBitmaskOfPieceAt(uint8_t index);
 
 
 
@@ -202,7 +207,15 @@ private:
 
     void ApplyMove(uint8_t from, uint8_t to);
 
-   
+    /**
+     * This function is responsible for finalizing the game state after the given move, or promotion is concluded.
+     * This function is only called once per full move, meaning it is called after promotion called XOR non-promotion move, 
+     *   never in a promotion move.
+     * This move returns the state the game gets into after the full move is finished.
+     */
+   ChessGameStateType FinalizeStateAfterMove();
+
+   bool HasAnyLegalMoves(ChessColorType color);
 };
 
 #endif
