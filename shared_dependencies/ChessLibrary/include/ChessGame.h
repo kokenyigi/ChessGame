@@ -100,6 +100,8 @@ private:
 
     ChessGameState _state;
 
+    ChessGameStateType _gameStateType = ChessGameStateType::STATE_PLAYING;
+
     std::vector<uint64_t> _previousZobristHashes;
 
     ChessTileViewData _boardView[64];
@@ -146,6 +148,7 @@ public:
     ChessTileViewData GetTileViewData(const unsigned int index);
     inline ChessColorType GetWhoseTurnItIs(){return (ChessColorType)this->_state.currentPlayer;}
     inline ChessColorType GetOpponentsColor(){return GetInverseColor((ChessColorType)this->_state.currentPlayer);}
+    inline ChessGameStateType GetGameStateType(){return this->_gameStateType;}
 
     static uint64_t CreateBitmaskFromIndex(uint8_t index);
     static uint8_t GetLeastSignificantBitIndexFromBitmask(uint64_t bitmask);

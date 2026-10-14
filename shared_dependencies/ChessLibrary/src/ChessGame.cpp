@@ -11,6 +11,11 @@ ChessGame::ChessGame()
 ChessMoveResultData ChessGame::TryMove(unsigned int fromIndex, unsigned int toIndex)
 {
     ChessMoveResultData retvalResult;
+    if(_gameStateType != ChessGameStateType::STATE_PLAYING &&  _gameStateType != ChessGameStateType::STATE_DRAW_REQUESTABLE)
+    {
+        return retvalResult; // If we are in the wrong state, or the game has ended, we dont do anything.
+    }
+
     if(fromIndex >= 64u || toIndex >= 64u || fromIndex == toIndex) return retvalResult;
 
     ChessTileData fromTileData = GetTileDataAt(fromIndex);
@@ -43,11 +48,53 @@ ChessMoveResultData ChessGame::TryMove(unsigned int fromIndex, unsigned int toIn
     unsigned int toRank = toIndex / 8u;
     if(fromTileData.piece == PIECE_PAWN && (toRank == 7u || toRank == 0u) ) // if the move resulted in a pawn promotion
     {
+        _gameStateType = ChessGameStateType::STATE_PROMOTION_REQUIRED;
         retvalResult.gameState = ChessGameStateType::STATE_PROMOTION_REQUIRED;
         return retvalResult;
     }
 
-    retvalResult.gameState = FinalizeStateAfterMove();
+    _gameStateType = FinalizeStateAfterMove(); // we save the chessgamestatetype into our main state type
+    retvalResult.gameState = _gameStateType; // we will also return it
+    if(retvalResult.gameState == ChessGameStateType::STATE_PLAYING || retvalResult.gameState == ChessGameStateType::STATE_DRAW_REQUESTABLE)
+    {
+        SwapToOtherPlayer();
+    }
+
+    return retvalResult;
+}
+
+ChessMoveResultData ChessGame::ChoosePromotionPiece(ChessPieceType promotionPiece)
+{
+    ChessMoveResultData retvalResult;
+    if(_gameStateType != ChessGameStateType::STATE_PROMOTION_REQUIRED) return retvalResult;
+
+    if(promotionPiece < PIECE_BISHOP || promotionPiece > PIECE_QUEEN) return retvalResult;
+
+    retvalResult.type = ChessMoveResultType::RESULT_SUCCESS;
+
+    ChessColorType promotionColor = GetWhoseTurnItIs();
+    uint64_t pawnsOfPromotingColor = this->_state.piecePositions[promotionColor][PIECE_PAWN];
+    
+    uint64_t finalRankBitmask = 0ull;
+    if(promotionColor == COLOR_LIGHT)
+    {
+        finalRankBitmask =  0xFF00000000000000;
+    }
+    else // color dark
+    {
+        finalRankBitmask =  0x00000000000000FF;
+    }
+
+    //there is only one pawn at final rank of promoting color(ensured)
+    uint64_t bitmaskOfPromotingPawn = finalRankBitmask & pawnsOfPromotingColor;
+    //uint8_t indexOfPromotingPawn  = GetLeastSignificantBitIndexFromBitmask(bitmaskOfPromotingPawn); // there is only one bit
+
+    //now we make the promotion "move"
+    _state.piecePositions[promotionColor][PIECE_PAWN] &= ~bitmaskOfPromotingPawn; // remove pawn
+    _state.piecePositions[promotionColor][promotionPiece] |= bitmaskOfPromotingPawn; // add promotion piece
+
+    _gameStateType = FinalizeStateAfterMove();
+    retvalResult.gameState = _gameStateType;
     if(retvalResult.gameState == ChessGameStateType::STATE_PLAYING || retvalResult.gameState == ChessGameStateType::STATE_DRAW_REQUESTABLE)
     {
         SwapToOtherPlayer();
@@ -173,6 +220,8 @@ void ChessGame::SetupStartState()
     //We have set the positions for the pieces
     // we have to clear the previously stored zobrist hashes
     this->_previousZobristHashes.clear();
+
+    this->_gameStateType = ChessGameStateType::STATE_PLAYING;
     
 }
 

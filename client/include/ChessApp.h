@@ -190,6 +190,15 @@ private:
 
     uint64_t _cachedLegalMovesBitmask = 0ull;
     uint64_t _cachedLegalCapturesBitmask = 0ull;
+
+    bool _isPromotionSelectionActive = false;
+    float _promotionSelectionHeight = 1.1f;
+    float _promotionSelectionDistanceBetweenPieces = 0.6f;
+    float _promotionSelectionOutwardsDelta = 0.7f;
+    float _promotionSelectionPieceBaseWidth = 0.4f;
+    float _promotionSelectionPieceHoverWidth = 0.5f;
+    ChessPieceType _hoveredPromotionPieceType = PIECE_NONE;
+    glm::vec3 _promotionSelectionColor = glm::vec3(0,1,0);
     
 public:
     ChessApp();
@@ -270,6 +279,7 @@ private:
     void ChessViewPortResize(int newWidth, int newHeight);
     void ChessViewPortRender();
     glm::vec2 GetViewPositionFromChessGameIndex(int index);
+    void RenderPromotionPieces(); // based on who is promoting, and where renders the promoting pieces
     void ChessViewPortUpdate(float deltaTime);
     void ChessViewPortMouseMove(float newX, float newY);
     void ChessViewPortMouseClick(MouseButtonType button, MouseActionType action);
@@ -277,11 +287,14 @@ private:
 
     //Picking related functions
     ViewportPickResult PickChessViewPort(int x, int y);
+
     void ResetPickingState();
     void TryAdvancePickingState(unsigned int pickedIndex);
     void CalculateCachedPickingState();
     void CalculateCachedPreviousMoveBitmask();
     unsigned int GetChessGameIndexFromVirtualPosition(float x, float z); // we dont care about y coord
+
+    ChessPieceType CalculateChessPieceTypeFromPickedPosition(glm::vec3 pickedPosition);
 
     //The main move functions inside view
     // returns whether or not move was succesful

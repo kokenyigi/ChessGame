@@ -661,10 +661,13 @@ void ChessApp::ChessViewPortRender()
 			this->_pieceMeshes[tileViewData.piece].Draw();
 		}
 	}
-	//this->_pieceShader.SetUniform<glm::mat4>("uWorldTransform",glm::mat4(1.0f));
-	//this->_pieceShader.SetUniform<glm::vec3>("uColor",this->_boardDarkColor);
 
-	//this->_pieceMeshes[0].Draw();
+	//we render the promoting pieces with the same shader, the piece shader
+	if(_isPromotionSelectionActive == true)
+	{
+		RenderPromotionPieces();
+	}
+
 
 	this->_pieceShader.Unbind();
 
@@ -751,6 +754,40 @@ glm::vec2 ChessApp::GetViewPositionFromChessGameIndex(int index)
 	return bottomLeft + glm::vec2(positionIndicies) * glm::vec2(boardEighthWidth,boardEighthWidth);
 }
 
+void ChessApp::RenderPromotionPieces()
+{
+	
+	//assumption: promotions has happend on the previous move
+	ChessColorType promotingPlayer = _chessGame.GetWhoseTurnItIs();
+
+	glm::vec2 promotingPawnPositionXZ = GetViewPositionFromChessGameIndex(_previousMoveSecondIndex);
+	glm::vec3 promotingSelectionMiddle = glm::vec3(
+		promotingPawnPositionXZ.x + _promotionSelectionOutwardsDelta * (promotingPlayer == COLOR_LIGHT ? 1: -1),
+		this->_promotionSelectionHeight,
+		promotingPawnPositionXZ.y);
+	
+	glm::vec3 promotingSelectionBishopPos = promotingSelectionMiddle + 
+		glm::vec3(0,0, 1.5f * _promotionSelectionDistanceBetweenPieces * (promotingPlayer == COLOR_LIGHT?-1:1));
+
+
+	this->_pieceShader.SetUniform<glm::vec3>("uColor",_promotionSelectionColor);
+
+	glm::vec3 promotingSelectionDeltaVec = glm::vec3(0,0,_promotionSelectionDistanceBetweenPieces * (promotingPlayer == COLOR_LIGHT?1:-1));
+	for(uint8_t pieceType = 1u; pieceType < 5u; ++pieceType)
+	{
+		glm::vec3 currentPiecePosition = promotingSelectionBishopPos + promotingSelectionDeltaVec * (float)(pieceType - 1u);
+
+		glm::mat4 currentPromotionPieceWorldTransform = 
+			glm::translate(glm::mat4(1.0f),currentPiecePosition) * 
+			glm::scale(glm::mat4(1.0f),glm::vec3(_promotionSelectionPieceBaseWidth)) *
+			(promotingPlayer == COLOR_LIGHT? _lightBaseRotationTransform : _darkBaseRotationTransform);
+
+			this->_pieceShader.SetUniform<glm::mat4>("uWorldTransform",currentPromotionPieceWorldTransform);
+			this->_pieceMeshes[pieceType].Draw();
+	}
+
+}
+
 ViewportPickResult ChessApp::PickChessViewPort(int x, int y)
 {
 	ViewportPickResult retval;
@@ -793,6 +830,8 @@ void ChessApp::ResetPickingState()
 void ChessApp::TryAdvancePickingState(unsigned int pickedIndex)
 {
 	if(pickedIndex >= 64u) return;
+
+	if(_isPromotionSelectionActive == true) return; // if selection is active we cant pick
 
 	ChessTileViewData whatIsOnThisPickedTile = this->_chessGame.GetTileViewData(pickedIndex);
 	ChessColorType whoseTurnIsIt = this->_chessGame.GetWhoseTurnItIs();
@@ -917,6 +956,17 @@ bool ChessApp::TryMakeMove(unsigned int firstIndex, unsigned int secondIndex)
 	{
 		//we return with a quick false
 		return false;
+	}
+
+	ChessColorType currentPlayer = _chessGame.GetWhoseTurnItIs();
+	if(moveResult.gameState == ChessGameStateType::STATE_GAME_WON)
+	{
+		std::cout<<((currentPlayer == COLOR_LIGHT) ? "Light" : "Dark") << " Player won the game!\n"; 
+	}
+	else if(moveResult.gameState == ChessGameStateType::STATE_PROMOTION_REQUIRED)
+	{
+		std::cout<<((currentPlayer == COLOR_LIGHT) ? "Light" : "Dark") << " Player is required to choose a promotion piece!\n";
+		_isPromotionSelectionActive = true; // TODO: deactive later
 	}
 	
 	return true;
