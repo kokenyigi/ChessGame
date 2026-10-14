@@ -41,14 +41,14 @@ ChessMoveResultData ChessGame::TryMove(unsigned int fromIndex, unsigned int toIn
     SetupViewBoardBasedOnState(); // for view
 
     unsigned int toRank = toIndex / 8u;
-    if(fromTileData.piece == PIECE_PAWN && (toRank >= 7u || toRank <= 0u) ) // if the move resulted in a pawn promotion
+    if(fromTileData.piece == PIECE_PAWN && (toRank == 7u || toRank == 0u) ) // if the move resulted in a pawn promotion
     {
         retvalResult.gameState = ChessGameStateType::STATE_PROMOTION_REQUIRED;
         return retvalResult;
     }
 
     retvalResult.gameState = FinalizeStateAfterMove();
-    if(retvalResult.gameState == ChessGameStateType::STATE_PLAYING && retvalResult.gameState == ChessGameStateType::STATE_DRAW_REQUESTABLE)
+    if(retvalResult.gameState == ChessGameStateType::STATE_PLAYING || retvalResult.gameState == ChessGameStateType::STATE_DRAW_REQUESTABLE)
     {
         SwapToOtherPlayer();
     }
@@ -1049,7 +1049,7 @@ ChessGameStateType ChessGame::FinalizeStateAfterMove()
     uint64_t currentColorAttackBitmask = GetAttackBitmaskOf(currentColor);
     bool isEnemyKingUnderAttack = (this->_state.piecePositions[enemyColor][PIECE_KING] & currentColorAttackBitmask) != 0ull;
     bool doesEnemyHaveAnyLegalMovesAfterAttack = HasAnyLegalMoves(enemyColor);
-    if(doesEnemyHaveAnyLegalMovesAfterAttack)
+    if(!doesEnemyHaveAnyLegalMovesAfterAttack)
     {
         if(isEnemyKingUnderAttack)
         {

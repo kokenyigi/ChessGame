@@ -14,5 +14,5 @@ void main()
 {
     gl_Position = uViewProjectionMatrix * uWorldTransform * vec4(aPosition,1.0f);
     vPosition = vec3(uWorldTransform * vec4(aPosition,1));
-    vNormal = aNormal; // requires inverse transposed matrix
+    vNormal = vec3(uWorldTransform * vec4(aNormal,0)); // requires inverse transposed matrix
 }

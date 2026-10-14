@@ -277,6 +277,8 @@ bool TryLoadObjFile(const std::string &filePathRelative,
     std::vector<glm::vec3> uniqueVertexNormals;
     std::vector<glm::vec2> uniqueVertexTexCoords;
 
+	std::vector<unsigned int> newVertexPositionToUniqueVertexPositionIndex;
+
     // Now we prepare our unique-keeping system, which will be a hash-set(unordered)
     // This struct contains the components which define a unique VERTEX, 
     struct IndexKey
@@ -313,6 +315,8 @@ bool TryLoadObjFile(const std::string &filePathRelative,
     //These boolean values are set to true if the mesh has the given properties
     bool doesMeshHaveTexcoords = false;
     bool doesMeshHaveNormals = false;
+
+	bool firstIndexingBeingProcessed = true;
 
     std::ifstream meshFile(filePathRelative);
     std::string meshFileLineBuffer;
@@ -387,12 +391,28 @@ bool TryLoadObjFile(const std::string &filePathRelative,
              * One more thing: when indexing, a face can consist of undefined numbers of vertices (triangles, quads ..etc.)
              * for this reason, we have to assemble the vertices in a weird, polygon-wise manner.
              */
+			if(firstIndexingBeingProcessed)
+			{
+				if(doesMeshHaveNormals == false) // for smooth shading we have the same number of normals as positions.
+				{
+					uniqueVertexNormals.resize(uniqueVertexPositions.size());
+					for(int i=0;i<uniqueVertexNormals.size();++i)
+					{
+						uniqueVertexNormals[i] = glm::vec3(0,0,0);
+					}
+				}
+
+				firstIndexingBeingProcessed = false;
+			}
 
             if(wordsOfLine.size() < 4 ) return false;
 
             int polygonSize = wordsOfLine.size() -1 ;
             std::vector<unsigned int> polygonVertexIndices;
             polygonVertexIndices.reserve(polygonSize);
+			std::vector<unsigned int> polygonVertexPositionIndices;
+			polygonVertexPositionIndices.resize(polygonSize);
+
 
 			int newlyCreatedVertexCount = 0;
 
@@ -411,6 +431,7 @@ bool TryLoadObjFile(const std::string &filePathRelative,
 
 				//We are bound to have a position.
 				indexKey.positionIndex = std::stoi(currentVertexAttributeIndices[0]);
+				polygonVertexPositionIndices[i] = indexKey.positionIndex -1;
 
 				//Now we have to figure out if we have a texture coord specified.
 				if(currentVertexAttributeIndices.size() >= 2 && currentVertexAttributeIndices[1].length() != 0)
@@ -425,15 +446,12 @@ bool TryLoadObjFile(const std::string &filePathRelative,
 				}
 
 
-				if(doesMeshHaveNormals)
-				{
-					
-				}
+				
 				//Now that we have parsed the read index set of p - t - n , then now we check if these combinations of vertices
 				//Already exists inside the hasmap, if yes we just simply use the index stored inside there.
 				auto mapIt = threeIndexComponentToVertexIndex.find(indexKey);
 				
-				if (mapIt != threeIndexComponentToVertexIndex.end() && doesMeshHaveNormals)
+				if (mapIt != threeIndexComponentToVertexIndex.end())
 				{
 					//we found the key, therefore we already have a vertex specified with these indices
 					unsigned int vertexIndex = mapIt->second;
@@ -446,6 +464,7 @@ bool TryLoadObjFile(const std::string &filePathRelative,
 					int effectivePositionIndex = indexKey.positionIndex < 0 ? uniqueVertexPositions.size() + indexKey.positionIndex:
 						indexKey.positionIndex -1;
 					newMeshVertexPositions.push_back(uniqueVertexPositions[effectivePositionIndex]);
+					newVertexPositionToUniqueVertexPositionIndex.push_back(effectivePositionIndex);
 					if(doesMeshHaveNormals)
 					{
 						//This if either happens for all vertices, or for none, which is REALLY good.
@@ -476,17 +495,42 @@ bool TryLoadObjFile(const std::string &filePathRelative,
 
 			if(!doesMeshHaveNormals)
 			{
-				//If we dont have normals vectors, we have to create them now.
-				// for FLAT SHADING we have to push polygonsize amountonto the normal storage.
-				glm::vec3 posA = newMeshVertexPositions[polygonVertexIndices[0]];
-				glm::vec3 posB = newMeshVertexPositions[polygonVertexIndices[1]];
-				glm::vec3 posC = newMeshVertexPositions[polygonVertexIndices[2]];
-
-				glm::vec3 normal = glm::normalize(glm::cross(posB-posA,posC-posA));
-
-				for(int i=0;i<newlyCreatedVertexCount;++i)
+				if(false) // flat shading
 				{
-					newMeshVertexNormals.push_back(normal);
+					//If we dont have normals vectors, we have to create them now.
+					// for FLAT SHADING we have to push polygonsize amountonto the normal storage.
+					glm::vec3 posA = newMeshVertexPositions[polygonVertexIndices[0]];
+					glm::vec3 posB = newMeshVertexPositions[polygonVertexIndices[1]];
+					glm::vec3 posC = newMeshVertexPositions[polygonVertexIndices[2]];
+
+					glm::vec3 normal = glm::normalize(glm::cross(posB-posA,posC-posA));
+
+					for(int i=0;i<newlyCreatedVertexCount;++i)
+					{
+						newMeshVertexNormals.push_back(normal);
+					}
+				}
+				else if(true) // smooth shading, later we will provide an interface to toggle between this setting
+				{
+
+					for(int i=0;i<polygonSize - 2;++i)
+					{
+						glm::ivec3 currentPositionAndNormalIndicesOfTraingle = glm::ivec3(
+							polygonVertexPositionIndices[0],
+							polygonVertexPositionIndices[1 + i],
+							polygonVertexPositionIndices[2 + i]);
+
+						glm::vec3 posA = uniqueVertexPositions[currentPositionAndNormalIndicesOfTraingle.x];
+						glm::vec3 posB = uniqueVertexPositions[currentPositionAndNormalIndicesOfTraingle.y];
+						glm::vec3 posC = uniqueVertexPositions[currentPositionAndNormalIndicesOfTraingle.z];
+
+						glm::vec3 dirtyNormal = glm::cross(posB-posA,posC-posA);
+
+						uniqueVertexNormals[currentPositionAndNormalIndicesOfTraingle.x] += dirtyNormal;
+						uniqueVertexNormals[currentPositionAndNormalIndicesOfTraingle.y] += dirtyNormal;
+						uniqueVertexNormals[currentPositionAndNormalIndicesOfTraingle.z] += dirtyNormal;
+					}
+					
 				}
 			}
 
@@ -503,6 +547,21 @@ bool TryLoadObjFile(const std::string &filePathRelative,
 			}
         }
     }
+
+	if(!doesMeshHaveNormals)
+	{
+		//normalize the unique normals, and upload them into the newVertexNormals buffer(output)
+		for(int i=0;i<uniqueVertexNormals.size();++i)
+		{
+			uniqueVertexNormals[i] = glm::normalize(uniqueVertexNormals[i]);
+		}
+
+		for(int i=0;i<newVertexPositionToUniqueVertexPositionIndex.size();++i)
+		{
+			//because uniquevertexnormals is the same size as uniqvertex pos, and we do smooth shading.
+			newMeshVertexNormals.push_back(uniqueVertexNormals[newVertexPositionToUniqueVertexPositionIndex[i]]);
+		}
+	}
 	
 
     return true;

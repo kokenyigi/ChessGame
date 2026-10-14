@@ -23,6 +23,10 @@ const float legalMoveCircleDiameterRatioToTileWidth = 0.4f;
 const float legalCaptureRingInnerDiameterRatioToTileWidth = 0.8f;
 const float legalCaptureRingOuterDiameterRatioToTileWidth = 0.9f;
 
+const vec3 ambientLightColor = vec3(0.4,0.4,0.4);
+const vec3 diffuseLightColor = vec3(1,1,1);
+const vec3 lightDirection = -normalize(vec3(1,1,1));
+
 out vec4 fragColor;
 
 //assumes index is in [0 ,63]
@@ -44,6 +48,8 @@ uvec2 CreateBitmaskFromIndex(uint index)
 
 void main()
 {
+    vec3 fragNormal = normalize(vNormal);
+
     float halfWidth = uBoardWidth * 0.5f;
     vec2 checkPatternValue = vPosition.xz + vec2(halfWidth,halfWidth);
 
@@ -98,18 +104,29 @@ void main()
         return;
     }
     
-    
+    // lighting
 
+
+    vec3 tileColor;
     int checkValue = indexValue.y + indexValue.x ;
     if(checkValue % 2 == 0)
     {
-        fragColor = vec4(uDarkColor,1);
+        tileColor = uDarkColor;
     }
     else
     {
-        fragColor = vec4(uLightColor,1);
+        tileColor = uLightColor;
     }
+
+
+    float diffuseComponent = max(dot(fragNormal,-lightDirection),0);
+
+    vec3 lightingColor = ambientLightColor + diffuseComponent * diffuseLightColor;
+
+
+    vec3 finalColor = tileColor * lightingColor;
     
     
+    fragColor = vec4(finalColor,1);
     
 }
