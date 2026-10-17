@@ -299,6 +299,8 @@ private:
     //The main move functions inside view
     // returns whether or not move was succesful
     bool TryMakeMove(unsigned int firstIndex, unsigned int secondIndex);
+
+    bool TryChoosePromotionPiece(ChessPieceType promotionPiece);
     
 };
 

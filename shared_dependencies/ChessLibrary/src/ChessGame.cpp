@@ -93,6 +93,8 @@ ChessMoveResultData ChessGame::ChoosePromotionPiece(ChessPieceType promotionPiec
     _state.piecePositions[promotionColor][PIECE_PAWN] &= ~bitmaskOfPromotingPawn; // remove pawn
     _state.piecePositions[promotionColor][promotionPiece] |= bitmaskOfPromotingPawn; // add promotion piece
 
+    SetupViewBoardBasedOnState();
+
     _gameStateType = FinalizeStateAfterMove();
     retvalResult.gameState = _gameStateType;
     if(retvalResult.gameState == ChessGameStateType::STATE_PLAYING || retvalResult.gameState == ChessGameStateType::STATE_DRAW_REQUESTABLE)

@@ -692,6 +692,26 @@ void ChessApp::ChessViewPortMouseMove(float newX, float newY)
 
 		_chessViewportPreviousMousePos = _chessViewportCurrentMousePos;
 	}
+
+	if(_isPromotionSelectionActive == true)
+	{
+		_hoveredPromotionPieceType = PIECE_NONE;
+		if(newX > 0 && newX < this->_chessViewportSize.x && newY > 0 && newY < this->_chessViewportSize.y)
+		{
+			ViewportPickResult pickResult = PickChessViewPort(newX, newY);
+
+			if(pickResult.wasAnythingActuallyThere == true)
+			{
+				ChessPieceType hoveredSelectionPiece = CalculateChessPieceTypeFromPickedPosition(pickResult.pickedVirtualCoordinates);
+				this->_hoveredPromotionPieceType = hoveredSelectionPiece;
+
+				
+				//std::cout<<"Hovered Piece: " << hoveredSelectionPiece<<"\n";
+			}
+			
+		}
+		
+	}
 }
 
 void ChessApp::ChessViewPortMouseClick(MouseButtonType button, MouseActionType action)
@@ -724,6 +744,20 @@ void ChessApp::ChessViewPortMouseClick(MouseButtonType button, MouseActionType a
 				this->_isDraggingChessViewport = true;
 
 				_chessViewportPreviousMousePos = _chessViewportCurrentMousePos;
+
+				if(this->_isPromotionSelectionActive == true && _hoveredPromotionPieceType != PIECE_NONE)
+				{
+					bool promotionResult = TryChoosePromotionPiece(_hoveredPromotionPieceType);
+
+					if(promotionResult == true) // promotion went through safely
+					{
+						//disable promotion
+						_isPromotionSelectionActive = false;
+						_hoveredPromotionPieceType = PIECE_NONE;
+					}
+
+					//todo something here with retval, but maybe not needed.
+				}
 			}
 		}
 		else if(action == MouseActionType::MOUSE_ACTION_RELEASE)
@@ -779,7 +813,7 @@ void ChessApp::RenderPromotionPieces()
 
 		glm::mat4 currentPromotionPieceWorldTransform = 
 			glm::translate(glm::mat4(1.0f),currentPiecePosition) * 
-			glm::scale(glm::mat4(1.0f),glm::vec3(_promotionSelectionPieceBaseWidth)) *
+			glm::scale(glm::mat4(1.0f),glm::vec3(pieceType == _hoveredPromotionPieceType ? _promotionSelectionPieceHoverWidth : _promotionSelectionPieceBaseWidth)) *
 			(promotingPlayer == COLOR_LIGHT? _lightBaseRotationTransform : _darkBaseRotationTransform);
 
 			this->_pieceShader.SetUniform<glm::mat4>("uWorldTransform",currentPromotionPieceWorldTransform);
@@ -948,6 +982,45 @@ unsigned int ChessApp::GetChessGameIndexFromVirtualPosition(float x, float z)
     return index;
 }
 
+ChessPieceType ChessApp::CalculateChessPieceTypeFromPickedPosition(glm::vec3 pickedPosition)
+{
+    if(_isPromotionSelectionActive == false) return PIECE_NONE;
+
+	ChessColorType promotingPlayer = _chessGame.GetWhoseTurnItIs();
+
+	glm::vec2 promotingPawnPositionXZ = GetViewPositionFromChessGameIndex(_previousMoveSecondIndex);
+	glm::vec2 promotingSelectionMiddleXZ = promotingPawnPositionXZ + 
+		glm::vec2(_promotionSelectionOutwardsDelta * (promotingPlayer == COLOR_LIGHT ? 1: -1), 0);
+	
+	glm::vec2 promotingSelectionMinXZ = promotingSelectionMiddleXZ - 
+		glm::vec2(0.5f*_promotionSelectionDistanceBetweenPieces, 2.0f* _promotionSelectionDistanceBetweenPieces);
+
+	glm::vec2 promotingSelectionMaxXz = promotingSelectionMiddleXZ + 
+		glm::vec2(0.5f*_promotionSelectionDistanceBetweenPieces, 2.0f* _promotionSelectionDistanceBetweenPieces);
+
+	// boundery from bottom is height.
+	//if pos is outside of the boundaries of the promotion selection box, we return early
+	if(	pickedPosition.y < _promotionSelectionHeight || 
+		pickedPosition.x < promotingSelectionMinXZ.x || pickedPosition.z < promotingSelectionMinXZ.y ||
+		pickedPosition.x >promotingSelectionMaxXz.x || pickedPosition.z > promotingSelectionMaxXz.y)
+	{
+		return PIECE_NONE;
+	}
+
+	//now we know that the picked Position is inside the selection box -> can calculate in which segment it is in(Not enough)
+	// based on whoich color is promoting we have to filp indexing in segments.
+	// based on z coord we calc the segment it is in.
+
+	//this value is between minz and maxz
+	float  normalizedZValue = pickedPosition.z - promotingSelectionMinXZ.y;
+	unsigned int segmentIndex = glm::clamp((unsigned int)(normalizedZValue / _promotionSelectionDistanceBetweenPieces),0u,3u);
+
+	segmentIndex = promotingPlayer == COLOR_DARK ? 3u - segmentIndex : segmentIndex;
+
+	return (ChessPieceType)(segmentIndex + 1u);
+
+}
+
 bool ChessApp::TryMakeMove(unsigned int firstIndex, unsigned int secondIndex)
 {
 	ChessMoveResultData moveResult = this->_chessGame.TryMove(firstIndex,secondIndex);
@@ -968,7 +1041,24 @@ bool ChessApp::TryMakeMove(unsigned int firstIndex, unsigned int secondIndex)
 		std::cout<<((currentPlayer == COLOR_LIGHT) ? "Light" : "Dark") << " Player is required to choose a promotion piece!\n";
 		_isPromotionSelectionActive = true; // TODO: deactive later
 	}
+
+	// [TODO]: Handle different result cases
 	
+	return true;
+}
+
+bool ChessApp::TryChoosePromotionPiece(ChessPieceType promotionPiece)
+{
+    if(_isPromotionSelectionActive == false) return false;
+
+	if(promotionPiece < PIECE_BISHOP || promotionPiece > PIECE_QUEEN) return false;
+
+	ChessMoveResultData promotionResult = _chessGame.ChoosePromotionPiece(promotionPiece);
+
+	if(promotionResult.type == ChessMoveResultType::RESULT_FAILURE) return false;
+
+	// [TODO]: Handle different result cases
+
 	return true;
 }
 
