@@ -3,8 +3,14 @@
 //#include "Utils.h"
 #include <cmath>
 
+#include <random>
+
 ChessGame::ChessGame()
 {
+    this->_previousZobristHashes.reserve(151); // will never be higher than the halfmove counter
+
+    SetupDefaultZobristKeys();
+
     StartNewGame();
 }
 
@@ -21,6 +27,10 @@ ChessMoveResultData ChessGame::TryMove(unsigned int fromIndex, unsigned int toIn
     ChessTileData fromTileData = GetTileDataAt(fromIndex);
     ChessColorType currentPlayer = GetWhoseTurnItIs();
     ChessColorType enemyPlayer = GetInverseColor(currentPlayer);
+    ChessTileData toTileData = GetTileDataAt(toIndex);
+
+    uint8_t castlingRightsBefore = _state.castlingRights;
+
     if(fromTileData.color != currentPlayer || fromTileData.piece == PIECE_NONE) return retvalResult;
 
     uint64_t bitmaskOfPositionThePieceMovesTo = CreateBitmaskFromIndex(toIndex);
@@ -29,7 +39,7 @@ ChessMoveResultData ChessGame::TryMove(unsigned int fromIndex, unsigned int toIn
 
     ChessGameState stateBeforeMove = _state;
 
-    ApplyMove(fromIndex,toIndex); // TODO: we should get pawn promotion state from somewhere
+    ApplyMove(fromIndex,toIndex);
 
     
     // if the king of the current player is attacked after the move
@@ -43,7 +53,27 @@ ChessMoveResultData ChessGame::TryMove(unsigned int fromIndex, unsigned int toIn
     }
     retvalResult.type = ChessMoveResultType::RESULT_SUCCESS;
 
+    
+    if(fromTileData.piece == PIECE_PAWN || toTileData.piece != PIECE_NONE) // pawn move or capture
+    {
+        this->_halfMoveCount = 0u;
+        
+    }
+    else
+    {
+        ++this->_halfMoveCount;
+    }
+
+    uint8_t castlingRightsAfter = _state.castlingRights;
+    if(fromTileData.piece == PIECE_PAWN || toTileData.piece != PIECE_NONE || 
+        (fromTileData.piece == PIECE_KING && castlingRightsAfter != castlingRightsBefore) )
+    {
+        this->_previousZobristHashes.clear();
+    }
+
     SetupViewBoardBasedOnState(); // for view
+
+
 
     unsigned int toRank = toIndex / 8u;
     if(fromTileData.piece == PIECE_PAWN && (toRank == 7u || toRank == 0u) ) // if the move resulted in a pawn promotion
@@ -53,12 +83,10 @@ ChessMoveResultData ChessGame::TryMove(unsigned int fromIndex, unsigned int toIn
         return retvalResult;
     }
 
+    SwapToOtherPlayer();
+
     _gameStateType = FinalizeStateAfterMove(); // we save the chessgamestatetype into our main state type
     retvalResult.gameState = _gameStateType; // we will also return it
-    if(retvalResult.gameState == ChessGameStateType::STATE_PLAYING || retvalResult.gameState == ChessGameStateType::STATE_DRAW_REQUESTABLE)
-    {
-        SwapToOtherPlayer();
-    }
 
     return retvalResult;
 }
@@ -95,12 +123,12 @@ ChessMoveResultData ChessGame::ChoosePromotionPiece(ChessPieceType promotionPiec
 
     SetupViewBoardBasedOnState();
 
+
+    SwapToOtherPlayer();
+
+
     _gameStateType = FinalizeStateAfterMove();
     retvalResult.gameState = _gameStateType;
-    if(retvalResult.gameState == ChessGameStateType::STATE_PLAYING || retvalResult.gameState == ChessGameStateType::STATE_DRAW_REQUESTABLE)
-    {
-        SwapToOtherPlayer();
-    }
 
     return retvalResult;
 }
@@ -108,6 +136,11 @@ ChessMoveResultData ChessGame::ChoosePromotionPiece(ChessPieceType promotionPiec
 ChessLegalMovesData ChessGame::GetLegalMovesBitmaskOfPieceAt(uint8_t index)
 {
     ChessLegalMovesData retvalLegalMoves;
+    if(_gameStateType != ChessGameStateType::STATE_PLAYING &&  _gameStateType != ChessGameStateType::STATE_DRAW_REQUESTABLE)
+    {
+        return retvalLegalMoves; // we are in a game finished state, therefore we cant do anything further.
+    }
+
     if(index >= 64u) return retvalLegalMoves;
 
     ChessTileData tileAtIndex = GetTileDataAt(index);
@@ -207,9 +240,6 @@ void ChessGame::SetupStartState()
     this->_state.piecePositions[COLOR_LIGHT][PIECE_KING] |= CreateBitmaskFromIndex(4u);
     this->_state.piecePositions[COLOR_DARK][PIECE_KING] |= CreateBitmaskFromIndex(60u);
 
-    //white is always the first to move
-    this->_state.currentPlayer = COLOR_LIGHT;
-
     // in the beginning state every castling right is provided
     this->_state.castlingRights = CASTLING_BLACK_KINGSIDE | CASTLING_BLACK_QUEENSIDE | CASTLING_WHITE_KINGSIDE | CASTLING_WHITE_QUEENSIDE;
 
@@ -217,11 +247,17 @@ void ChessGame::SetupStartState()
     this->_state.enPassantFile = FILE_NONE;
 
     // we have to reset the halfmove counter(the counter which counts how many moves have been made since the last capture or pawn move)
-    this->_state.halfMoveCount = 0u;
+    this->_halfMoveCount = 0u;
+
+    //white is always the first to move
+    this->_state.currentPlayer = COLOR_LIGHT;
 
     //We have set the positions for the pieces
     // we have to clear the previously stored zobrist hashes
     this->_previousZobristHashes.clear();
+    this->_previousZobristHashes.push_back(this->CalculateZobristHashOfCurrentState());
+
+    
 
     this->_gameStateType = ChessGameStateType::STATE_PLAYING;
     
@@ -1071,7 +1107,7 @@ void ChessGame::ApplyMove(uint8_t from, uint8_t to)
         {
             _state.castlingRights &= ~kingSideCastlingRightOfEnemyColor;
         }
-        else if(fromFile == 0u && toRank == baseRankOfEnemyColor && ((_state.castlingRights & queenSideCastlingRightOfEnemyColor) != 0u))
+        else if(toFile == 0u && toRank == baseRankOfEnemyColor && ((_state.castlingRights & queenSideCastlingRightOfEnemyColor) != 0u))
         {
             _state.castlingRights &= ~queenSideCastlingRightOfEnemyColor;
         }
@@ -1094,15 +1130,16 @@ void ChessGame::ApplyMove(uint8_t from, uint8_t to)
 
 ChessGameStateType ChessGame::FinalizeStateAfterMove()
 {
+    // Important: a player turn swap has been called before, but this func is called at the end of the previous colors move 
     ChessColorType currentColor = (ChessColorType)_state.currentPlayer;
     ChessColorType enemyColor = GetInverseColor(currentColor);
 
-    uint64_t currentColorAttackBitmask = GetAttackBitmaskOf(currentColor);
-    bool isEnemyKingUnderAttack = (this->_state.piecePositions[enemyColor][PIECE_KING] & currentColorAttackBitmask) != 0ull;
-    bool doesEnemyHaveAnyLegalMovesAfterAttack = HasAnyLegalMoves(enemyColor);
-    if(!doesEnemyHaveAnyLegalMovesAfterAttack)
+    uint64_t enemyColorAttackBitmask = GetAttackBitmaskOf(enemyColor);
+    bool isCurrentKingUnderAttack = (this->_state.piecePositions[currentColor][PIECE_KING] & enemyColorAttackBitmask) != 0ull;
+    bool doesCurrentColorHaveAnyLegalMovesAfterAttack = HasAnyLegalMoves(currentColor);
+    if(!doesCurrentColorHaveAnyLegalMovesAfterAttack)
     {
-        if(isEnemyKingUnderAttack)
+        if(isCurrentKingUnderAttack)
         {
             return ChessGameStateType::STATE_GAME_WON;
         }
@@ -1112,7 +1149,48 @@ ChessGameStateType ChessGame::FinalizeStateAfterMove()
         }
     }
 
-    // [TODO]: check rest of the draw cases and state changes.
+    bool isThereSufficientMaterialToCheckMate = IsThereSufficientMaterialToCheckMate();
+    if(isThereSufficientMaterialToCheckMate == false)
+    {
+        return ChessGameStateType::STATE_DRAW_INSUFFICIENT_MATERIAL;
+    }
+
+    //After the main ending cases have been checked, we process position repetition calculations,
+    // Meaning the game can enter a state where draw can be requested after either:
+    //  - the same position has been repeated atleast 3 times
+    //  - 100 moves have passed without capturing a piece or pawn movement(100 half moves happend)
+    //
+    // the game can literally end by :
+    //  - the same position coming up atleast for the 5th time
+    //  - halfmovecount reached 150 (75 for each side)
+
+    //Supposed information at this point of spacetime:
+    // - this function is only called after a fully legal move was made.
+    // - the halfmove counter is only incremented/reset outside, not here! but still, we handle its result here.
+    // - we always calculate a zobrist hash no matter what happend, bc the zobrist hash array might have been reset in the outside, but we
+    //   dont give a hot fuck about that.
+
+    uint64_t currentPositionsZobristHash = CalculateZobristHashOfCurrentState();
+    int amountOfTimesThisHashAppearsInStorage = 1; // atleast one(the current)
+    for(int i = 0;i<this->_previousZobristHashes.size();++i)
+    {
+        if(currentPositionsZobristHash == this->_previousZobristHashes[i])
+        {
+            ++amountOfTimesThisHashAppearsInStorage;
+        }
+    }
+
+    //lets put the new zobrist hash inside the storage (so we dont check it before)
+    this->_previousZobristHashes.push_back(currentPositionsZobristHash);
+
+    if(amountOfTimesThisHashAppearsInStorage >= 5 || this->_halfMoveCount >= 150u)
+    {
+        return ChessGameStateType::STATE_DRAW_REPETITION;
+    }
+    else if(amountOfTimesThisHashAppearsInStorage >= 3 || this->_halfMoveCount >= 100u)
+    {
+        return ChessGameStateType::STATE_DRAW_REQUESTABLE;
+    }
 
     return ChessGameStateType::STATE_PLAYING;
 }
@@ -1153,6 +1231,169 @@ bool ChessGame::HasAnyLegalMoves(ChessColorType color)
     return hasFoundLegalMove;
 }
 
+bool ChessGame::IsThereSufficientMaterialToCheckMate()
+{
+    ChessColorType currentColor = GetWhoseTurnItIs();
+    ChessColorType enemyColor = GetOpponentsColor();
+
+    if( this->_state.piecePositions[currentColor][PIECE_QUEEN] != 0ull ||
+        this->_state.piecePositions[enemyColor][PIECE_QUEEN] != 0ull ||
+        this->_state.piecePositions[currentColor][PIECE_ROOK] != 0ull ||
+        this->_state.piecePositions[enemyColor][PIECE_ROOK] != 0ull ||
+        this->_state.piecePositions[currentColor][PIECE_PAWN] != 0ull ||
+        this->_state.piecePositions[enemyColor][PIECE_PAWN] != 0ull)
+    {
+        //If we get here that means checkmate can be more than possible
+        return true;
+    }
+
+    uint64_t currentColorHorses = this->_state.piecePositions[currentColor][PIECE_HORSE];
+    uint64_t enemyColorHorses = this->_state.piecePositions[enemyColor][PIECE_HORSE];
+    uint64_t currentColorBishops = this->_state.piecePositions[currentColor][PIECE_BISHOP];
+    uint64_t enemyColorBishops = this->_state.piecePositions[enemyColor][PIECE_BISHOP];
+
+    uint8_t currentColorHorseCount = CountOneBitsOfBitmask(currentColorHorses);
+    uint8_t enemyColorHorseCount = CountOneBitsOfBitmask(enemyColorHorses);
+    uint8_t currentColorBishopCount = CountOneBitsOfBitmask(currentColorBishops);
+    uint8_t enemyColorBishopCount = CountOneBitsOfBitmask(enemyColorBishops);
+
+    /*
+    4 main cases where there just isnt sufficient amount of material:
+    king -king
+    king + bishop - king
+    king + horse - king
+    king + bishop - king + bishop (if bishops on same colored tiles)
+    */
+
+    uint8_t allHorseCount = currentColorHorseCount + enemyColorHorseCount;
+    uint8_t allBishopCount = currentColorBishopCount + enemyColorBishopCount;
+
+    if(allHorseCount == 0u && allBishopCount == 0u) // king - king
+    {
+        return false;
+    }
+    else if(allHorseCount == 0u && allBishopCount == 1u) // king + bishop - king
+    {
+        return false;
+    }
+    else if(allBishopCount == 0u && allHorseCount == 1u) // king+ horse - king
+    {
+        return false;
+    }
+    else if(allHorseCount == 0u && currentColorBishopCount == 1u && enemyColorBishopCount == 1u) // king + bishop - king + bishop
+    {
+        // if these opposing bishops are on the same tile color, its also insufficient material.
+        uint8_t indexOfCurrentColorBishop = GetLeastSignificantBitIndexFromBitmask(currentColorBishops);
+        uint8_t rankOfCurrentColorBishop = indexOfCurrentColorBishop / 8u;
+        uint8_t fileOfCurrentColorBishop = indexOfCurrentColorBishop % 8u;
+
+        uint8_t indexOfEnemyColorBishop = GetLeastSignificantBitIndexFromBitmask(enemyColorBishops);
+        uint8_t rankOfEnemyColorBishop = indexOfEnemyColorBishop / 8u;
+        uint8_t fileOfEnemyColorBishop = indexOfEnemyColorBishop % 8u;
+
+        uint8_t currentColorBishopTileCheckvalue = rankOfCurrentColorBishop + fileOfCurrentColorBishop;
+        uint8_t enemyColorBishopTileCheckvalue = rankOfEnemyColorBishop + fileOfEnemyColorBishop;
+        if(currentColorBishopTileCheckvalue % 2 == enemyColorBishopTileCheckvalue % 2)
+        {
+            return false;
+        }
+    }
+
+    //otherwise
+    return true;
+}
+
+uint8_t ChessGame::GetValidEnPassantFileForCurrentPlayer()
+{
+    if(this->_state.enPassantFile == FILE_NONE) return FILE_NONE;
+
+    // now we have to check whether or not the one or two pawn places that could attack this en passing pawn actually exist
+    // information we know: the other player has made an en passant pawn move, 
+    //  meaning they moved a pawn 2 squares in the given en passant file
+    ChessColorType currentPlayerColor = GetWhoseTurnItIs();
+    ChessColorType enemyPlayerColor = GetOpponentsColor();
+    
+    uint8_t enPassantRank = currentPlayerColor == COLOR_LIGHT ? 4u : 3u; // the rank where the en passant pawn is;
+    uint8_t indexOfEnPassantPawn = enPassantRank * 8u + this->_state.enPassantFile;
+    uint64_t bitmaskOfEnPassantPawn = CreateBitmaskFromIndex(indexOfEnPassantPawn);
+
+    uint8_t behindEnPassantRank = currentPlayerColor == COLOR_LIGHT ? 5u : 2u; // the rank where the en passant pawn is
+    uint8_t behindEnPassantIndex = behindEnPassantRank * 8u + this->_state.enPassantFile;
+
+    uint8_t indicesOfPawnsBesideEnPassantPawn[2] = {64u,64u};
+ 
+    if(this->_state.enPassantFile > FILE_A && ((bitmaskOfEnPassantPawn >> 1u) & this->_state.piecePositions[currentPlayerColor][PIECE_PAWN]) )
+    {
+        //minus neighbour exists
+        indicesOfPawnsBesideEnPassantPawn[0] = indexOfEnPassantPawn - 1u;
+    }
+
+    if(this->_state.enPassantFile < FILE_H && ((bitmaskOfEnPassantPawn << 1u) & this->_state.piecePositions[currentPlayerColor][PIECE_PAWN]) )
+    {
+        //positive neighbour exists
+        indicesOfPawnsBesideEnPassantPawn[1] = indexOfEnPassantPawn + 1u;
+    }
+
+
+    bool foundValidEnPassantMove = false;
+    for(int potentialPawn = 0;potentialPawn < 2 && !foundValidEnPassantMove; ++potentialPawn)
+    {
+        if(indicesOfPawnsBesideEnPassantPawn[potentialPawn] >= 64u) continue;
+
+        //the move is now: this potential pawn, to behind the en passant pawn.
+        ChessGameState stateBeforeMove = this->_state;
+
+        ApplyMove(indicesOfPawnsBesideEnPassantPawn[potentialPawn],behindEnPassantIndex);
+
+        uint64_t attackBitmaskOfEnemy = GetAttackBitmaskOf(enemyPlayerColor);
+        if( (_state.piecePositions[currentPlayerColor][PIECE_KING] & attackBitmaskOfEnemy) == 0ull)
+        {
+            foundValidEnPassantMove = true;
+        }
+
+        _state = stateBeforeMove;
+    }
+
+    return (foundValidEnPassantMove == true ? _state.enPassantFile : FILE_NONE);
+}
+
+uint64_t ChessGame::CalculateZobristHashOfCurrentState()
+{
+    uint64_t retvalZobristHash = 0ull;
+
+    for(int color = 0; color < 2 ;++color)
+    {
+        for(int piece = 0; piece < 6 ; ++ piece)
+        {
+            uint64_t currentPiecesBitmask = this->_state.piecePositions[color][piece];
+            while(currentPiecesBitmask)
+            {
+                uint8_t currentPieceIndex = GetLeastSignificantBitIndexFromBitmask(currentPiecesBitmask);
+
+                retvalZobristHash ^= this->_defaultZobristKeys.pieceHashes[color][piece][currentPieceIndex];
+
+                currentPiecesBitmask = RemoveLeastSignificantBitOfBitmask(currentPiecesBitmask);
+            }
+        }
+    }
+
+    //this isnt right, en passant file is only valid for this hashing if after this move the enemy could capture the passing pawn legally
+    uint8_t validEnpassantFile = GetValidEnPassantFileForCurrentPlayer();
+    if(validEnpassantFile <= FILE_NONE) // there is enpassant right, but it the enemy might not have a move to capture it!!
+    {
+        retvalZobristHash ^= this->_defaultZobristKeys.enPassantHashes[validEnpassantFile];
+    }
+
+    //side to move(whos turn it is)
+    retvalZobristHash ^= this->_defaultZobristKeys.sideHashes[this->GetWhoseTurnItIs()];
+
+    //castling right combination's current hash:
+    retvalZobristHash ^= this->_defaultZobristKeys.castlingHashes[this->_state.castlingRights]; //castlingRights always 4 bit number, 15u at max
+
+    return retvalZobristHash;
+}
+
+
 uint64_t ChessGame::CreateBitmaskFromIndex(uint8_t index)
 {
     if(index >= 64u) return 0ull;
@@ -1181,4 +1422,49 @@ uint64_t ChessGame::RemoveLeastSignificantBitOfBitmask(uint64_t bitmask)
 	if(bitmask == 0ull) return 0ull;
 
     return bitmask & (bitmask - 1ull);
+}
+
+uint8_t ChessGame::CountOneBitsOfBitmask(uint64_t bitmask)
+{
+    if(bitmask == 0ull) return 0u;
+
+    uint8_t count = 0u;
+    while(bitmask)
+    {
+        bitmask = RemoveLeastSignificantBitOfBitmask(bitmask);
+
+        ++count;
+    }
+
+    return count;
+}
+
+void ChessGame::SetupDefaultZobristKeys()
+{
+    std::mt19937_64 randomGenerator(DEFAULT_ZOBRIST_SEED);
+
+    for(int color = 0;color<2;++color)
+    {
+        for(int piece = 0;piece<6;++piece)
+        {
+            for(int positionIndex = 0; positionIndex < 64 ;++positionIndex)
+            {
+                this->_defaultZobristKeys.pieceHashes[color][piece][positionIndex] = randomGenerator();
+            }
+        }
+    }
+
+    for(int castlingCombinationIndex = 0; castlingCombinationIndex < 16 ;++castlingCombinationIndex)
+    {
+        this->_defaultZobristKeys.castlingHashes[castlingCombinationIndex] = randomGenerator();
+    }
+
+    for(int enPassantFile = 0;enPassantFile < 8 ;++enPassantFile)
+    {
+        this->_defaultZobristKeys.enPassantHashes[enPassantFile] = randomGenerator();
+    }
+
+    this->_defaultZobristKeys.sideHashes[0] = randomGenerator();
+    this->_defaultZobristKeys.sideHashes[1] = randomGenerator();
+    
 }

@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <vector>
 
+#define DEFAULT_ZOBRIST_SEED 0x123456789ABCDEF0ull
+
 enum ChessPieceType : uint8_t
 {
     PIECE_PAWN = 0u,
@@ -50,7 +52,6 @@ struct ChessGameState
     uint8_t currentPlayer = COLOR_LIGHT;
     uint8_t castlingRights = 0u; // bits
     uint8_t enPassantFile = FILE_NONE;
-    uint8_t halfMoveCount = 0u;
 };
 
 struct ChessTileViewData
@@ -94,6 +95,14 @@ struct ChessTileData
     ChessColorType color = COLOR_NONE;
 };
 
+struct ChessZobristKeys
+{
+    uint64_t pieceHashes[2][6][64];
+    uint64_t castlingHashes[16]; // one fore each combination
+    uint64_t enPassantHashes[8];
+    uint64_t sideHashes[2];
+};
+
 class ChessGame
 {
 private:
@@ -102,9 +111,15 @@ private:
 
     ChessGameStateType _gameStateType = ChessGameStateType::STATE_PLAYING;
 
-    std::vector<uint64_t> _previousZobristHashes;
 
     ChessTileViewData _boardView[64];
+
+
+    std::vector<uint64_t> _previousZobristHashes;
+
+    uint8_t _halfMoveCount = 0u;
+
+    ChessZobristKeys _defaultZobristKeys;
 
 public:
     ChessGame();
@@ -153,7 +168,16 @@ public:
     static uint64_t CreateBitmaskFromIndex(uint8_t index);
     static uint8_t GetLeastSignificantBitIndexFromBitmask(uint64_t bitmask);
     static uint64_t RemoveLeastSignificantBitOfBitmask(uint64_t bitmask);
+    static uint8_t CountOneBitsOfBitmask(uint64_t bitmask);
 private:
+
+    /**
+     * This method initializes all of the starting zobrist keys with random 64 bit unsigned integer values.
+     * These "start" keys / hashes will be used later to produce fine tuned zobrist hashes when a move has been made.
+     */
+    void SetupDefaultZobristKeys();
+
+
     /**
      * This method setups a clean, new chessboard state, with the valid rules and all.
      * Used when a newgame is created.
@@ -216,9 +240,34 @@ private:
      *   never in a promotion move.
      * This move returns the state the game gets into after the full move is finished.
      */
-   ChessGameStateType FinalizeStateAfterMove();
+    ChessGameStateType FinalizeStateAfterMove();
 
-   bool HasAnyLegalMoves(ChessColorType color);
+    bool HasAnyLegalMoves(ChessColorType color);
+
+    /**
+     * This function looks at the pieces on both sides, and determines if there is even enough piece material to make a checkmate.
+     * This doesnt instantly say that a checkmate can be forced by either sides, it says:
+     * "If only this much material exists on the board checkmate cant happen." -> its a draw
+     */
+    bool IsThereSufficientMaterialToCheckMate();
+
+
+    /**
+     * This is a small but very important function!
+     * This function uses the current en-passant file (if there is one), and the given player who's turn it currently will be.
+     * It calculates and returns the en passant file that EXISTS and can legally be interacted with by the current player.
+     * This means, an en passant file is only valid, if the current player can legally hit, capture that passing pawn.
+     * We need this function because the basic _enPassantFile variable inside the chess state only tells us where a pawn has double moved
+     *  in the previous move, made by the opponent player, BUT it doesnt tell whether or not that en passant chance could be exploited by
+     *  (us) the current player. This is the reason this function was created.
+     */
+    uint8_t GetValidEnPassantFileForCurrentPlayer();
+
+
+    /**
+     * This function calculates the current zobrist hash based on this->_state, and the default, starting hash keys, XORing them together.
+     */
+    uint64_t CalculateZobristHashOfCurrentState();
 };
 
 #endif

@@ -1034,12 +1034,34 @@ bool ChessApp::TryMakeMove(unsigned int firstIndex, unsigned int secondIndex)
 	ChessColorType currentPlayer = _chessGame.GetWhoseTurnItIs();
 	if(moveResult.gameState == ChessGameStateType::STATE_GAME_WON)
 	{
-		std::cout<<((currentPlayer == COLOR_LIGHT) ? "Light" : "Dark") << " Player won the game!\n"; 
+		
 	}
 	else if(moveResult.gameState == ChessGameStateType::STATE_PROMOTION_REQUIRED)
 	{
-		std::cout<<((currentPlayer == COLOR_LIGHT) ? "Light" : "Dark") << " Player is required to choose a promotion piece!\n";
-		_isPromotionSelectionActive = true; // TODO: deactive later
+		
+	}
+	switch(moveResult.gameState)
+	{
+		case ChessGameStateType::STATE_GAME_WON:
+			std::cout<<((currentPlayer == COLOR_LIGHT) ? "Dark" : "Light") << " Player won the game!\n"; 
+		break;
+
+		case ChessGameStateType::STATE_PROMOTION_REQUIRED:
+			std::cout<<((currentPlayer == COLOR_LIGHT) ? "Light" : "Dark") << " Player is required to choose a promotion piece!\n";
+			_isPromotionSelectionActive = true;
+		break;
+
+		case ChessGameStateType::STATE_DRAW_REQUESTABLE:
+			std::cout<<"Draw can be requested by either player.\n";
+		break;
+
+		case ChessGameStateType::STATE_DRAW_REPETITION:
+			std::cout<<"Draw by repetition.\n";
+		break;
+
+		case ChessGameStateType::STATE_DRAW_STALEMATE:
+			std::cout<<"Draw by stalemate";
+		break;
 	}
 
 	// [TODO]: Handle different result cases
