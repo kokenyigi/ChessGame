@@ -16,10 +16,10 @@ class ChessNetworker
 private:
 
     std::thread _senderThread;
-    RingBuffer<> _senderQueue;
+    //RingBuffer<> _senderQueue;
 
     std::thread _receiverThread;
-    RingBuffer<> _recieverQueue;
+    //RingBuffer<> _recieverQueue;
 
 public:
 
