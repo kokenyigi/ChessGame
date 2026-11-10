@@ -67,7 +67,7 @@ public:
         if(_buffer != nullptr)
         {
             delete[] _buffer;
-            _buffer = nullptr    
+            _buffer = nullptr;
         }
 
         _capacity = 0u;

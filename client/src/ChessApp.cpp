@@ -310,6 +310,59 @@ bool ChessApp::InitMyGui()
 
 	_containerOnlineLobbyMenu.AddControl(&_buttonOnlineLobbyMenuToMultiplayerMenu);
 
+	_containerServerConnection.SetMargin(MarginType::MARGIN_TOP,70.0f);
+	_containerServerConnection.SetMargin(MarginType::MARGIN_LEFT,10.f);
+	_containerServerConnection.SetMargin(MarginType::MARGIN_RIGHT,10.0f);
+	_containerServerConnection.SetSize(SizeType::SIZE_HEIGHT,100.0f);
+	_containerServerConnection.SetIsVisible(false);
+
+
+	_containerOnlineLobbyMenu.AddControl(&_containerServerConnection);
+
+	_labelServerAddress.SetMargin(MarginType::MARGIN_TOP,10);
+	_labelServerAddress.SetMargin(MarginType::MARGIN_LEFT,0);
+	_labelServerAddress.SetSize(SizeType::SIZE_WIDTH, 390.0f);
+	_labelServerAddress.SetSize(SizeType::SIZE_HEIGHT, 50.0f);
+	_labelServerAddress.SetTextColor(1,1,1);
+	_labelServerAddress.SetText("Server address:");
+	_labelServerAddress.SetTextAllignment(TextAllignmentType::TEXT_ALLIGNMENT_LEFT);
+
+	_containerServerConnection.AddControl(&_labelServerAddress);
+
+	_inputServerAddress.SetMargin(MarginType::MARGIN_TOP,5);
+	_inputServerAddress.SetMargin(MarginType::MARGIN_LEFT,400);
+	_inputServerAddress.SetSize(SizeType::SIZE_HEIGHT,60);
+	_inputServerAddress.SetSize(SizeType::SIZE_WIDTH,280);
+	_inputServerAddress.SetBaseColor(1,1,1);
+	_inputServerAddress.SetTextColor(0,0,0);
+	_inputServerAddress.SetText("127.0.0.1:4444");
+	_inputServerAddress.SetEditHeadColor(0.8,0.1,0.3);
+
+	_containerServerConnection.AddControl(&_inputServerAddress);
+
+	_buttonConnectToServer.SetMargin(MarginType::MARGIN_TOP,10.0f);
+	_buttonConnectToServer.SetMargin(MarginType::MARGIN_LEFT,690.0f);
+	_buttonConnectToServer.SetSize(SizeType::SIZE_WIDTH, 120.0f);
+	_buttonConnectToServer.SetSize(SizeType::SIZE_HEIGHT, 50.0f);
+	_buttonConnectToServer.SetBaseColor(0.4,0.4,0.4);
+	_buttonConnectToServer.SetHoverColor(0.1,0.7,0.1);
+	_buttonConnectToServer.SetText("Connect");
+	_buttonConnectToServer.SetTextColor(1,1,1);
+	_buttonConnectToServer.SetCallBackContext(this);
+	_buttonConnectToServer.SetCallback(ConnectToServerCallback);
+
+	_containerServerConnection.AddControl(&_buttonConnectToServer);
+
+	_labelServerAdressErrorMessage.SetMargin(MarginType::MARGIN_TOP,10.0f);
+	_labelServerAdressErrorMessage.SetMargin(MarginType::MARGIN_LEFT,820.0f);
+	_labelServerAdressErrorMessage.SetMargin(MarginType::MARGIN_RIGHT,10.0f);
+	_labelServerAdressErrorMessage.SetSize(SizeType::SIZE_HEIGHT,50.0f);
+	_labelServerAdressErrorMessage.SetTextColor(1,0,0);
+	_labelServerAdressErrorMessage.SetText("Error");
+	_labelServerAdressErrorMessage.SetTextAllignment(TextAllignmentType::TEXT_ALLIGNMENT_LEFT);
+	
+	_containerServerConnection.AddControl(&_labelServerAdressErrorMessage);
+
 	_containerOnlineLobbyMenu.SetMargin(MarginType::MARGIN_BOTTOM,0);
 	_containerOnlineLobbyMenu.SetMargin(MarginType::MARGIN_LEFT,0);
 	_containerOnlineLobbyMenu.SetMargin(MarginType::MARGIN_RIGHT,0);
@@ -494,6 +547,19 @@ void ChessApp::TryEnterOnlineOpponentLobbyMainState()
 
 	SetMainStateAs(MainStateType::MAINSTATE_ONLINE_OPPONENT_FINDING_LOBBY);
 	this->_containerOnlineLobbyMenu.SetIsActive(true);
+
+	//should be an if here: if connection is not set up properly, and else
+	//if connection hasnt been setup properly yet
+	if(_chessNetworker.GetIsConnectedToServer() == true)
+	{
+
+	}
+	else // isnt connected to server, therefore we must be in the server connection menu 
+	{
+		_containerServerConnection.SetIsActive(true);
+		_labelServerAdressErrorMessage.SetText(""); // zero- out error msg
+	}
+	
 }
 
 void ChessApp::TryEnterSameComputerOpponentMainState()
@@ -527,6 +593,31 @@ void ChessApp::TryEnterGamePlayingMainState()
 	{
 		//std::cout<<"Setting up same computer menu state, bc we entered from that\n";
 		SetupSameComputerGame();
+	}
+}
+
+void ChessApp::TryConnectToServer()
+{
+	int colonIndex = -1;
+	int i=0;
+	while( i<_serverAddress.length() && colonIndex < 0)
+	{
+		if(_serverAddress[i] == ':')
+		{
+			colonIndex = i;
+		}
+
+		++i;
+	}
+	std::string serverIp = _serverAddress.substr(0,colonIndex);
+	unsigned int serverPort = std::stoul(_serverAddress.substr(colonIndex + 1));
+
+	std::cout<<"Connection Being requested by client (ip:"<<serverIp << " port: " << serverPort << ")\n";
+
+	bool connectingResult = _chessNetworker.ConnectToServer(serverIp,serverPort);
+	if(connectingResult == false)
+	{
+		_labelServerAdressErrorMessage.SetText("Can`t Connect");
 	}
 }
 

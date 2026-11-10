@@ -25,6 +25,8 @@
 
 #include "ChessGame.h"
 
+#include "ChessNetworker.h"
+
 enum class MainStateType
 {
     MAINSTATE_NONE = 0,
@@ -119,7 +121,11 @@ private:
 
     // The multiplayer menu and its associated gui component
     Container _containerOnlineLobbyMenu;
+    
     Button _buttonOnlineLobbyMenuToMultiplayerMenu;
+
+    Container _containerServerConnection;
+    Label _labelServerAddress; TextInput _inputServerAddress; Button _buttonConnectToServer; Label _labelServerAdressErrorMessage;
 
     //The same computer menu
     Container _containerSameComputerMenu;
@@ -199,6 +205,12 @@ private:
     float _promotionSelectionPieceHoverWidth = 0.5f;
     ChessPieceType _hoveredPromotionPieceType = PIECE_NONE;
     glm::vec3 _promotionSelectionColor = glm::vec3(0,1,0);
+
+
+
+    // Networking related variables
+    ChessNetworker _chessNetworker;
+    std::string _serverAddress = "127.0.0.1:4444";
     
 public:
     ChessApp();
@@ -218,7 +230,7 @@ public:
 	static void WindowIconifiedCallback(GLFWwindow* window, int isIconified);
     */
 
-    //My own gui's callback functions
+    //Menu changing callback functions
     static void SwapToStartMenuCallback(void* context);
     static void SwapToSinglePlayerMenuCallback(void* context);
     static void SwapToMultiplayerMenuCallback(void* context);
@@ -226,6 +238,9 @@ public:
     static void SwapToSameComputerMenuCallback(void* context);
     static void SwapToGameMenuCallback(void* context);
     static void SwapToPreviousMenuCallback(void* context);
+
+    // Callbacks for Online Lobby items
+    static void ConnectToServerCallback(void* context){((ChessApp*)context)->TryConnectToServer();}
 
     // the viewport canvas callbacks
     static void ViewPortCanvasResizeCallback(void* context, int newWidth, int newHeight);
@@ -236,6 +251,8 @@ public:
     static void ViewPortCanvasMouseWheelCallback(void* context, float amount, MouseWheelDirection direction);
 
     static glm::uvec2 CreateUvec2FromUint64t(const uint64_t& bitmask);
+
+    
 
 private:
 
@@ -257,6 +274,15 @@ private:
     void TryEnterOnlineOpponentLobbyMainState();
     void TryEnterSameComputerOpponentMainState();
     void TryEnterGamePlayingMainState();
+
+    //These functions are online lobby and networking related
+
+    /**
+     * Based on the _serverAddress variable this function tries its best to connect the apps socket to the server.
+     * If it succeeds, then we enter the online lobby, otherwise throws an error message in the form of a red label, and refuses to elaborate.
+     * Famous failing point: wrong ip and/or port.
+     */
+    void TryConnectToServer();
 
     /**
      * This function set the state of the chessgame "model" class, and also sets the camera in a start angle

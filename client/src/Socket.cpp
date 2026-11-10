@@ -19,20 +19,31 @@ void Socket::Init()
     }
 }
 
-void Socket::Connect(const char *ipAddress, unsigned int port)
+int Socket::Connect(const char *ipAddress, unsigned int port)
 {
+    if(this->_crossPlatformSocket == INVALID_SOCKET)
+    {
+        return -1;
+    }
+
     struct sockaddr_in serverAdressData;
     memset(&serverAdressData,0,sizeof(struct sockaddr_in));
 
     serverAdressData.sin_family = AF_INET;
     serverAdressData.sin_port = htons(port);
-    inet_pton(AF_INET,ipAddress,&serverAdressData.sin_addr);
+    if(inet_pton(AF_INET,ipAddress,&serverAdressData.sin_addr) <= 0)
+    {
+        return -1;
+    }
 
     int connectionResult = connect(this->_crossPlatformSocket,(struct sockaddr*)&serverAdressData,sizeof(serverAdressData));
     if(connectionResult < 0)
     {
-        std::cout<<"[Error]: Connection to the remote host failed.\n";
+        //std::cout<<"[Error]: Connection to the remote host failed.\n";
+        return -1;
     }
+
+    return 0;
 }
 
 // size should be between 0 and 2billion(int limit)

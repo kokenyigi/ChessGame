@@ -1,0 +1,2 @@
+add_subdirectory(ChessLibrary)
+add_subdirectory(ChessNetworkingProtocol)

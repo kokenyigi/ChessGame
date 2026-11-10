@@ -46,11 +46,13 @@ find_package(OpenGL REQUIRED)
 
 target_link_libraries(chessClient PRIVATE
     chessLibrary
+    chessNetworkingProtocol
     glfw
     glm::glm
     OpenGL::GL
     glad
     stb_image
+    Ws2_32
 )
 
 # just a build time copying of the assets folder(we need it at a different location)

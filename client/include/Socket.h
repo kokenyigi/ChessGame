@@ -57,7 +57,7 @@ public:
     void Init();
 
     // connects to a host via its ipv4 ip and port
-    void Connect(const char* ipAddress,unsigned int port);
+    int Connect(const char* ipAddress,unsigned int port);
 
     ssize_t Send(const char* buffer, size_t size);
 

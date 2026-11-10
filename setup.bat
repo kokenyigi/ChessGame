@@ -1,7 +1,8 @@
 @echo off
 setlocal
 
-set "buildDirectory=build"
+set "baseBuildDirectory=build"
+set "subBuildDirectory=windows"
 
 set "shouldBuildServer=0"
 set "shouldBuildClient=0"
@@ -20,27 +21,33 @@ if not "%~1"=="" (
     set "shouldBuildServer=1"
 )
 
-if not exist "%buildDirectory%" (
-    mkdir "%buildDirectory%"
+if not exist "%baseBuildDirectory%" (
+    mkdir "%baseBuildDirectory%"
 )
 
-cd /d "%buildDirectory%"
+cd /d "%baseBuildDirectory%"
+
+if not exist "%subBuildDirectory%" (
+    mkdir "%subBuildDirectory%"
+)
+
+cd /d "%subBuildDirectory%"
 
 if "%shouldBuildClient%"=="1" (
     if "%shouldBuildServer%"=="1" (
-        cmake .. -G "Ninja" -DBUILD_CLIENT=ON -DBUILD_SERVER=ON
+        cmake ../.. -G "Ninja" -DBUILD_CLIENT=ON -DBUILD_SERVER=ON
     ) else (
-        cmake .. -G "Ninja" -DBUILD_CLIENT=ON -DBUILD_SERVER=OFF
+        cmake ../.. -G "Ninja" -DBUILD_CLIENT=ON -DBUILD_SERVER=OFF
     )
 ) else (
     if "%shouldBuildServer%"=="1" (
-        cmake .. -G "Ninja" -DBUILD_CLIENT=OFF -DBUILD_SERVER=ON
+        cmake ../.. -G "Ninja" -DBUILD_CLIENT=OFF -DBUILD_SERVER=ON
     )
 )
 
 if errorlevel 1 (
     echo CMake configuration failed.
-    cd ..
+    cd ../..
     exit /b 1
 )
 
@@ -48,10 +55,10 @@ cmake --build .
 
 if errorlevel 1 (
     echo Build failed.
-    cd ..
+    cd ../..
     exit /b 1
 )
 
-cd ..
+cd ../..
 
 endlocal

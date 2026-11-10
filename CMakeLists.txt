@@ -4,7 +4,11 @@ project(MyChessProject)
 option(BUILD_CLIENT "Build the client application" ON)
 option(BUILD_SERVER "Build the server application" ON)
 
-add_subdirectory(shared_dependencies/ChessLibrary)
+if(BUILD_SERVER AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message(FATAL_ERROR "Chess server requires Linux. Use WSL2 or native Linux.")
+endif()
+
+add_subdirectory(shared_dependencies)
 
 if(BUILD_CLIENT)
     add_subdirectory(client)
